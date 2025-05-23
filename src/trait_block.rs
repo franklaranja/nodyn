@@ -2,13 +2,13 @@ use syn::parse::Parse;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub(crate) struct Trait {
+pub(crate) struct TraitBlock {
     pub(crate) ident: syn::Ident,
     pub(crate) generics: syn::Generics,
     pub(crate) items: Vec<syn::TraitItem>,
 }
 
-impl Trait {
+impl TraitBlock {
     #[allow(dead_code)]
     pub(crate) fn new(
         ident: syn::Ident,
@@ -23,7 +23,7 @@ impl Trait {
     }
 }
 
-impl Parse for Trait {
+impl Parse for TraitBlock {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let _keyword = input.parse::<syn::token::Trait>()?;
         let ident = input.parse::<syn::Ident>()?;

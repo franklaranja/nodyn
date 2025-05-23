@@ -1,39 +1,43 @@
 use super::ident_from_path;
 use super::path_from_type;
-use crate::{Function, Trait, Type, syn_to_ident};
+use crate::{ImplBlock, TraitBlock, Type, syn_to_ident};
 use quote::quote;
 use std::collections::btree_map::{BTreeMap, Entry};
-use syn::{parse::Parse, spanned::Spanned};
+use syn::{
+    Attribute, Generics, Ident, Token, Visibility,
+    parse::{Parse, ParseStream},
+    spanned::Spanned,
+};
 
 #[derive(Debug, Clone)]
-pub(crate) struct Generator {
-    pub(crate) attrs: Vec<syn::Attribute>,
-    pub(crate) visibility: syn::Visibility,
-    pub(crate) ident: syn::Ident,
-    pub(crate) generics: syn::Generics,
+pub(crate) struct MultiType {
+    pub(crate) attrs: Vec<Attribute>,
+    pub(crate) visibility: Visibility,
+    pub(crate) ident: Ident,
+    pub(crate) generics: Generics,
     pub(crate) variants: BTreeMap<String, Type>,
-    pub(crate) impls: Vec<Function>,
-    pub(crate) traits: Vec<Trait>,
+    pub(crate) impl_blocks: Vec<ImplBlock>,
+    pub(crate) trait_blocks: Vec<TraitBlock>,
 }
 
-impl Parse for Generator {
-    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+impl Parse for MultiType {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
         let content;
         let mut wrapper = Self {
-            attrs: input.call(syn::Attribute::parse_outer)?,
-            visibility: input.parse::<syn::Visibility>()?,
-            ident: input.parse::<syn::Ident>()?,
-            generics: input.parse::<syn::Generics>()?,
+            attrs: input.call(Attribute::parse_outer)?,
+            visibility: input.parse::<Visibility>()?,
+            ident: input.parse::<Ident>()?,
+            generics: input.parse::<Generics>()?,
             variants: BTreeMap::new(),
-            impls: Vec::new(),
-            traits: Vec::new(),
+            impl_blocks: Vec::new(),
+            trait_blocks: Vec::new(),
         };
 
         let _brace_token = syn::braced!(content in input);
         while !content.is_empty() {
-            let attrs = content.call(syn::Attribute::parse_outer)?;
+            let attrs = content.call(Attribute::parse_outer)?;
             let ty = content.parse::<syn::Type>()?;
-            let _ = content.parse::<syn::Token![,]>();
+            let _ = content.parse::<Token![,]>();
             match &ty {
                 syn::Type::Path(syn::TypePath { path, .. }) => {
                     wrapper.add_variant(ident_from_path(path, ""), ty, attrs)?
@@ -67,7 +71,7 @@ impl Parse for Generator {
                         .collect::<Option<Vec<String>>>()
                         .map(|mut v| {
                             v.push("Tuple".to_string());
-                            syn::Ident::new(&v.concat(), elems.span())
+                            Ident::new(&v.concat(), elems.span())
                         });
 
                     if let Some(i) = ident {
@@ -82,10 +86,10 @@ impl Parse for Generator {
             }
         }
         loop {
-            if input.peek(syn::Token![impl]) {
-                wrapper.impls.push(input.parse::<Function>()?)
-            } else if input.peek(syn::Token![trait]) {
-                wrapper.traits.push(input.parse::<Trait>()?)
+            if input.peek(Token![impl]) {
+                wrapper.impl_blocks.push(input.parse::<ImplBlock>()?)
+            } else if input.peek(Token![trait]) {
+                wrapper.trait_blocks.push(input.parse::<TraitBlock>()?)
             } else if !input.is_empty() {
                 return Err(syn::Error::new(
                     input.lookahead1().error().span(),
@@ -102,21 +106,25 @@ impl Parse for Generator {
     }
 }
 
-impl Generator {
+impl MultiType {
     pub(crate) fn add_variant(
         &mut self,
-        ident: syn::Ident,
+        ident: Ident,
         ty: syn::Type,
-        attrs_in: Vec<syn::Attribute>,
+        attrs_in: Vec<Attribute>,
     ) -> syn::Result<()> {
         if let Entry::Vacant(entry) = self.variants.entry(ident.to_string()) {
             let mut into = Vec::new();
             let mut attrs = Vec::new();
             for a in attrs_in {
                 if a.path().is_ident("into") {
-                    into = a.parse_args_with(
-                        syn::punctuated::Punctuated::<syn::Type, syn::Token![,]>::parse_terminated,
-                    )?.iter().cloned().collect();
+                    into = a
+                        .parse_args_with(
+                            syn::punctuated::Punctuated::<syn::Type, Token![,]>::parse_terminated,
+                        )?
+                        .iter()
+                        .cloned()
+                        .collect();
                 } else {
                     attrs.push(a);
                 }

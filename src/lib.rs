@@ -37,23 +37,23 @@ use quote::{ToTokens, quote};
 use syn::spanned::Spanned;
 use syn::{TypeArray, TypePath, TypeReference, TypeSlice, parse_macro_input};
 
-mod functions;
-mod generator;
-mod traits;
+mod impl_block;
+mod multi_type;
+mod trait_block;
 mod types;
 
-pub(crate) use functions::Function;
-pub(crate) use generator::Generator;
-pub(crate) use traits::Trait;
+pub(crate) use impl_block::ImplBlock;
+pub(crate) use multi_type::MultiType;
+pub(crate) use trait_block::TraitBlock;
 pub(crate) use types::Type;
 
 #[proc_macro]
 pub fn wrap(input: TokenStream) -> TokenStream {
-    let generator = parse_macro_input!(input as Generator);
+    let multi_type = parse_macro_input!(input as MultiType);
 
-    let e_num = generator.generate_enum();
-    let from = generator.generate_from();
-    let try_into = generator.generate_try_from();
+    let e_num = multi_type.generate_enum();
+    let from = multi_type.generate_from();
+    let try_into = multi_type.generate_try_from();
 
     let expanded = quote! {
         #e_num
