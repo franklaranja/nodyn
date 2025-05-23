@@ -1,0 +1,9 @@
+#[test]
+fn tests() {
+    let t = trybuild::TestCases::new();
+    t.pass("tests/01_generate_enum.rs");
+    t.compile_fail("tests/02_empty_and_type_errors.rs");
+    t.pass("tests/03_impl_from.rs");
+    t.pass("tests/04_impl_try_from.rs");
+    t.pass("tests/05_into_attribute.rs");
+}

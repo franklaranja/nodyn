@@ -1,0 +1,5 @@
+error: This type can't be used
+  --> tests/02_empty_and_type_errors.rs:12:9
+   |
+12 |         (i32, bool),
+   |         ^^^^^^^^^^^
