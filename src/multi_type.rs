@@ -1,8 +1,16 @@
 use super::ident_from_path;
 use super::path_from_type;
 use crate::{ImplBlock, TraitBlock, Type, syn_to_ident};
+use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::btree_map::{BTreeMap, Entry};
+use syn::FnArg;
+use syn::TypeArray;
+use syn::TypePath;
+use syn::TypeReference;
+use syn::TypeSlice;
+use syn::TypeTuple;
+use syn::punctuated::Punctuated;
 use syn::{
     Attribute, Generics, Ident, Token, Visibility,
     parse::{Parse, ParseStream},
@@ -39,17 +47,17 @@ impl Parse for MultiType {
             let ty = content.parse::<syn::Type>()?;
             let _ = content.parse::<Token![,]>();
             match &ty {
-                syn::Type::Path(syn::TypePath { path, .. }) => {
+                syn::Type::Path(TypePath { path, .. }) => {
                     wrapper.add_variant(ident_from_path(path, ""), ty, attrs)?;
                 }
-                syn::Type::Reference(syn::TypeReference { elem, .. }) => {
+                syn::Type::Reference(TypeReference { elem, .. }) => {
                     if let Some(path) = path_from_type(elem) {
                         wrapper.add_variant(ident_from_path(path, "Ref"), ty, attrs)?;
                     } else {
                         return Err(syn::Error::new(ty.span(), "This type can't be used"));
                     }
                 }
-                syn::Type::Array(syn::TypeArray { elem, len, .. }) => {
+                syn::Type::Array(TypeArray { elem, len, .. }) => {
                     let ext = format!("Array{}", syn_to_ident(len));
                     if let Some(path) = path_from_type(elem) {
                         wrapper.add_variant(ident_from_path(path, &ext), ty, attrs)?;
@@ -57,14 +65,14 @@ impl Parse for MultiType {
                         return Err(syn::Error::new(ty.span(), "This type can't be used"));
                     }
                 }
-                syn::Type::Slice(syn::TypeSlice { elem, .. }) => {
+                syn::Type::Slice(TypeSlice { elem, .. }) => {
                     if let Some(path) = path_from_type(elem) {
                         wrapper.add_variant(ident_from_path(path, "Slice"), ty, attrs)?;
                     } else {
                         return Err(syn::Error::new(ty.span(), "This type can't be used"));
                     }
                 }
-                syn::Type::Tuple(syn::TypeTuple { elems, .. }) => {
+                syn::Type::Tuple(TypeTuple { elems, .. }) => {
                     let ident = elems
                         .iter()
                         .map(|t| path_from_type(t).map(|p| ident_from_path(p, "").to_string()))
@@ -119,9 +127,7 @@ impl MultiType {
             for a in attrs_in {
                 if a.path().is_ident("into") {
                     into = a
-                        .parse_args_with(
-                            syn::punctuated::Punctuated::<syn::Type, Token![,]>::parse_terminated,
-                        )?
+                        .parse_args_with(Punctuated::<syn::Type, Token![,]>::parse_terminated)?
                         .iter()
                         .cloned()
                         .collect();
@@ -145,11 +151,11 @@ impl MultiType {
         }
     }
 
-    pub(crate) fn enum_variants(&self) -> Vec<proc_macro2::TokenStream> {
+    pub(crate) fn enum_variants(&self) -> Vec<TokenStream> {
         self.variants.values().map(Type::enum_variant).collect()
     }
 
-    pub(crate) fn generate_enum(&self) -> proc_macro2::TokenStream {
+    pub(crate) fn generate_enum(&self) -> TokenStream {
         let variants = self.enum_variants();
         let attrs = &self.attrs;
         let visibility = &self.visibility;
@@ -164,7 +170,7 @@ impl MultiType {
         }
     }
 
-    pub(crate) fn generate_from(&self) -> Vec<proc_macro2::TokenStream> {
+    pub(crate) fn generate_from(&self) -> Vec<TokenStream> {
         let wrapper = &self.ident;
         let lt = &self.generics;
         self.variants
@@ -183,14 +189,14 @@ impl MultiType {
             .collect()
     }
 
-    pub(crate) fn generate_try_from(&self) -> Vec<proc_macro2::TokenStream> {
+    pub(crate) fn generate_try_from(&self) -> Vec<TokenStream> {
         let wrapper = &self.ident;
         let lt = &self.generics;
         self.variants
             .values()
             .map(|outer| {
                 let ty = &outer.ty;
-                let branches: Vec<proc_macro2::TokenStream> = self
+                let branches: Vec<TokenStream> = self
                     .variants
                     .values()
                     .map(|inner| inner.try_from_arm(outer, wrapper))
@@ -204,6 +210,49 @@ impl MultiType {
                                 #(#branches)*
                             }
                         }
+                    }
+                }
+            })
+            .collect()
+    }
+
+    pub(crate) fn generate_impl_blocks(&self) -> Vec<TokenStream> {
+        let wrapper = &self.ident;
+        let lt = &self.generics;
+        self.impl_blocks
+            .iter()
+            .map(|block| {
+                let items = &block.items;
+                let fns = block
+                    .functions
+                    .iter()
+                    .map(|f| {
+                        if let Some(FnArg::Receiver(_)) = f.sig.inputs.first() {
+                            let arms = self
+                                .variants
+                                .values()
+                                .map(|v| v.fn_call(&self.ident, &f.sig.ident, &f.sig.inputs));
+                            let attrs = &f.attrs;
+                            let vis = &f.vis;
+                            let signature = &f.sig;
+                            quote! {
+                                #(#attrs)*
+                                #vis #signature {
+                                    match self {
+                                        #(#arms)*
+                                    }
+                                }
+                            }
+                        } else {
+                            quote! {}
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                quote! {
+                    impl #lt #wrapper #lt {
+                         #(#items)*
+                         #(#fns)*
                     }
                 }
             })

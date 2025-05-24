@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
-use syn::{Attribute, Ident};
+use syn::{Attribute, FnArg, Ident, ReturnType, punctuated::Punctuated, token::Comma};
 
 #[derive(Debug, Clone)]
 pub(crate) struct Type {
@@ -34,6 +34,28 @@ impl Type {
                 other.ty.to_token_stream()
             );
             quote! { #wrapper::#ident(_) => Err(#message), }
+        }
+    }
+
+    pub(crate) fn fn_call(
+        &self,
+        wrapper: &Ident,
+        function: &Ident,
+        inputs: &Punctuated<FnArg, Comma>,
+    ) -> TokenStream {
+        let ident = &self.ident;
+        let args = inputs
+            .iter()
+            .filter_map(|arg| {
+                if let FnArg::Typed(typed) = arg {
+                    Some(&typed.pat)
+                } else {
+                    None
+                }
+            })
+            .collect::<Punctuated<_, Comma>>();
+        quote! {
+            #wrapper::#ident(value) =>  value.#function( #args ),
         }
     }
 }

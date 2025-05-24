@@ -54,12 +54,15 @@ pub fn wrap(input: TokenStream) -> TokenStream {
     let e_num = multi_type.generate_enum();
     let from = multi_type.generate_from();
     let try_into = multi_type.generate_try_from();
+    let impl_blocks = multi_type.generate_impl_blocks();
 
     let expanded = quote! {
         #e_num
         #(#from)*
         #(#try_into)*
+        #(#impl_blocks)*
     };
+
     TokenStream::from(expanded)
 }
 
