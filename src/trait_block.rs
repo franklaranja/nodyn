@@ -1,24 +1,22 @@
-use syn::parse::Parse;
+use syn::{Generics, Ident, parse::Parse};
+
+use crate::ImplBlock;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub(crate) struct TraitBlock {
-    pub(crate) ident: syn::Ident,
-    pub(crate) generics: syn::Generics,
-    pub(crate) items: Vec<syn::TraitItem>,
+    pub(crate) ident: Ident,
+    pub(crate) generics: Generics,
+    pub(crate) block: ImplBlock,
 }
 
 impl TraitBlock {
     #[allow(dead_code)]
-    pub(crate) const fn new(
-        ident: syn::Ident,
-        generics: syn::Generics,
-        items: Vec<syn::TraitItem>,
-    ) -> Self {
+    pub(crate) const fn new(ident: Ident, generics: Generics, block: ImplBlock) -> Self {
         Self {
             ident,
             generics,
-            items,
+            block,
         }
     }
 }
@@ -26,22 +24,14 @@ impl TraitBlock {
 impl Parse for TraitBlock {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let _keyword = input.parse::<syn::token::Trait>()?;
-        let ident = input.parse::<syn::Ident>()?;
-        let generics = input.parse::<syn::Generics>()?;
+        let ident = input.parse::<Ident>()?;
+        let generics = input.parse::<Generics>()?;
 
-        let content;
-
-        let _brace_token = syn::braced!(content in input);
-
-        let mut items = Vec::new();
-
-        while !content.is_empty() {
-            items.push(content.parse::<syn::TraitItem>()?);
-        }
+        let block = input.parse::<ImplBlock>()?;
         Ok(Self {
             ident,
             generics,
-            items,
+            block,
         })
     }
 }

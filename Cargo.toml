@@ -1,5 +1,6 @@
 [package]
 name = "nodyn"
+description = "A Rust proc macro to generate a enum wrapper for a set of types"
 version = "0.1.0"
 authors = ["Frank Laranja <laranja@riseup.net>"]
 repository = "https://github.com/franklaranja/nodyn"

@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
-use syn::{Attribute, FnArg, Ident, ReturnType, punctuated::Punctuated, token::Comma};
+use syn::{Attribute, FnArg, Ident, punctuated::Punctuated, token::Comma};
 
 #[derive(Debug, Clone)]
 pub(crate) struct Type {

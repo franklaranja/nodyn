@@ -7,4 +7,5 @@ fn tests() {
     t.pass("tests/04_impl_try_from.rs");
     t.pass("tests/05_into_attribute.rs");
     t.pass("tests/06_impl_blocks.rs");
+    t.pass("tests/07_trait_blocks.rs");
 }

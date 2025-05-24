@@ -24,13 +24,14 @@
 //!
 //! ```rust
 //! #[derive(Debug)]
-//! pub enum Foo {
+//! pub enum Foo<'a> {
 //!     I32(i32),
 //!     String(String),
-//!     U8U8U16Tuple((u8,u8,u16)),
+//!     U8U8U16((u8,u8,u16)),
 //!     BoolArray4,
 //!     StrRef(&'a str),
 //! }
+//! ```
 //!
 //! ## Automatic generated trait implementations
 //!
@@ -91,12 +92,14 @@ pub fn wrap(input: TokenStream) -> TokenStream {
     let from = multi_type.generate_from();
     let try_into = multi_type.generate_try_from();
     let impl_blocks = multi_type.generate_impl_blocks();
+    let trait_blocks = multi_type.generate_trait_blocks();
 
     let expanded = quote! {
         #e_num
         #(#from)*
         #(#try_into)*
         #(#impl_blocks)*
+        #(#trait_blocks)*
     };
 
     TokenStream::from(expanded)

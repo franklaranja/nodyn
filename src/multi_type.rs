@@ -95,6 +95,7 @@ impl Parse for MultiType {
         }
         loop {
             if input.peek(Token![impl]) {
+                let _keyword = input.parse::<syn::token::Impl>()?;
                 wrapper.impl_blocks.push(input.parse::<ImplBlock>()?);
             } else if input.peek(Token![trait]) {
                 wrapper.trait_blocks.push(input.parse::<TraitBlock>()?);
@@ -251,6 +252,26 @@ impl MultiType {
 
                 quote! {
                     impl #lt #wrapper #lt {
+                         #(#items)*
+                         #(#fns)*
+                    }
+                }
+            })
+            .collect()
+    }
+
+    pub(crate) fn generate_trait_blocks(&self) -> Vec<TokenStream> {
+        let wrapper = &self.ident;
+        let lt = &self.generics;
+        self.trait_blocks
+            .iter()
+            .map(|b| {
+                let trait_name = &b.ident;
+                let trait_gen = &b.generics;
+                let items = &b.block.items;
+                let fns = b.block.expand_methods(self);
+                quote! {
+                    impl #lt #trait_name #trait_gen for #wrapper #lt {
                          #(#items)*
                          #(#fns)*
                     }

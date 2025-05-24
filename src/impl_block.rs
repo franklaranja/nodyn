@@ -1,5 +1,8 @@
 use proc_macro2::{Delimiter, Group, TokenStream, TokenTree};
-use syn::{ImplItem, parse::Parse, parse2};
+use quote::quote;
+use syn::{FnArg, ImplItem, parse::Parse, parse2};
+
+use crate::MultiType;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
@@ -10,7 +13,7 @@ pub(crate) struct ImplBlock {
 
 impl Parse for ImplBlock {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let _keyword = input.parse::<syn::token::Impl>()?;
+        // let _keyword = input.parse::<syn::token::Impl>()?;
 
         let mut items = Vec::new();
         let mut functions = Vec::new();
@@ -40,5 +43,34 @@ impl Parse for ImplBlock {
             }
         }
         Ok(Self { items, functions })
+    }
+}
+
+impl ImplBlock {
+    pub(crate) fn expand_methods(&self, wrapper: &MultiType) -> Vec<TokenStream> {
+        self.functions
+            .iter()
+            .map(|f| {
+                if let Some(FnArg::Receiver(_)) = f.sig.inputs.first() {
+                    let arms = wrapper
+                        .variants
+                        .values()
+                        .map(|v| v.fn_call(&wrapper.ident, &f.sig.ident, &f.sig.inputs));
+                    let attrs = &f.attrs;
+                    let vis = &f.vis;
+                    let signature = &f.sig;
+                    quote! {
+                        #(#attrs)*
+                        #vis #signature {
+                            match self {
+                                #(#arms)*
+                            }
+                        }
+                    }
+                } else {
+                    quote! {}
+                }
+            })
+            .collect::<Vec<_>>()
     }
 }

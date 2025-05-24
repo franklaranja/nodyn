@@ -1,19 +1,9 @@
-nodyn::wrap! {
-  #[derive(Debug)]
-  TestEmpty {
-  }
-}
+// empty no longer causes errors (or anything else but waist)
 
 nodyn::wrap! {
-  #[derive(Debug)]
-  TestTypes<'a> {
-        Foo,
-        &'a str,
-        (i32, bool),
+  TestTypes {
+        * mut u32,
   }
 }
-
-#[derive(Debug)]
-struct Foo;
 
 fn main() {}
