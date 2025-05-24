@@ -18,15 +18,15 @@
 //!
 //! # Alternative crates
 //!
-//! - **enum_dispatch**
+//! - **`enum_dispatch`**
 //!     - uses procedural macros
-//!     - automatic From & TryInto
+//!     - automatic `From` & `TryInto`
 //!     - crate defined traits
 //!     - only generate trait implementations for traits in scope
 //!       in a very conveniant way.
-//! - **sum_type**
+//! - **`sum_type`**
 //!     - declaritative macros
-//!     - automatic From & TryFrom
+//!     - automatic `From` & `TryFrom`
 //!     - no lifetimes
 //!     - does not generate method or trait implementations
 //!
@@ -102,9 +102,9 @@ fn syn_to_ident<T: ToTokens>(t: T) -> String {
 fn path_from_type(ty: &syn::Type) -> Option<&syn::Path> {
     match ty {
         syn::Type::Path(TypePath { path, .. }) => Some(path),
-        syn::Type::Reference(TypeReference { elem, .. }) => path_from_type(elem),
-        syn::Type::Array(TypeArray { elem, .. }) => path_from_type(elem),
-        syn::Type::Slice(TypeSlice { elem, .. }) => path_from_type(elem),
+        syn::Type::Reference(TypeReference { elem, .. })
+        | syn::Type::Array(TypeArray { elem, .. })
+        | syn::Type::Slice(TypeSlice { elem, .. }) => path_from_type(elem),
         _ => None,
     }
 }

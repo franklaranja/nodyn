@@ -40,11 +40,11 @@ impl Parse for MultiType {
             let _ = content.parse::<Token![,]>();
             match &ty {
                 syn::Type::Path(syn::TypePath { path, .. }) => {
-                    wrapper.add_variant(ident_from_path(path, ""), ty, attrs)?
+                    wrapper.add_variant(ident_from_path(path, ""), ty, attrs)?;
                 }
                 syn::Type::Reference(syn::TypeReference { elem, .. }) => {
                     if let Some(path) = path_from_type(elem) {
-                        wrapper.add_variant(ident_from_path(path, "Ref"), ty, attrs)?
+                        wrapper.add_variant(ident_from_path(path, "Ref"), ty, attrs)?;
                     } else {
                         return Err(syn::Error::new(ty.span(), "This type can't be used"));
                     }
@@ -52,14 +52,14 @@ impl Parse for MultiType {
                 syn::Type::Array(syn::TypeArray { elem, len, .. }) => {
                     let ext = format!("Array{}", syn_to_ident(len));
                     if let Some(path) = path_from_type(elem) {
-                        wrapper.add_variant(ident_from_path(path, &ext), ty, attrs)?
+                        wrapper.add_variant(ident_from_path(path, &ext), ty, attrs)?;
                     } else {
                         return Err(syn::Error::new(ty.span(), "This type can't be used"));
                     }
                 }
                 syn::Type::Slice(syn::TypeSlice { elem, .. }) => {
                     if let Some(path) = path_from_type(elem) {
-                        wrapper.add_variant(ident_from_path(path, "Slice"), ty, attrs)?
+                        wrapper.add_variant(ident_from_path(path, "Slice"), ty, attrs)?;
                     } else {
                         return Err(syn::Error::new(ty.span(), "This type can't be used"));
                     }
@@ -75,7 +75,7 @@ impl Parse for MultiType {
                         });
 
                     if let Some(i) = ident {
-                        wrapper.add_variant(i, ty, attrs)?
+                        wrapper.add_variant(i, ty, attrs)?;
                     } else {
                         return Err(syn::Error::new(ty.span(), "This type can't be used"));
                     }
@@ -87,9 +87,9 @@ impl Parse for MultiType {
         }
         loop {
             if input.peek(Token![impl]) {
-                wrapper.impl_blocks.push(input.parse::<ImplBlock>()?)
+                wrapper.impl_blocks.push(input.parse::<ImplBlock>()?);
             } else if input.peek(Token![trait]) {
-                wrapper.trait_blocks.push(input.parse::<TraitBlock>()?)
+                wrapper.trait_blocks.push(input.parse::<TraitBlock>()?);
             } else if !input.is_empty() {
                 return Err(syn::Error::new(
                     input.lookahead1().error().span(),

@@ -10,7 +10,7 @@ pub(crate) struct TraitBlock {
 
 impl TraitBlock {
     #[allow(dead_code)]
-    pub(crate) fn new(
+    pub(crate) const fn new(
         ident: syn::Ident,
         generics: syn::Generics,
         items: Vec<syn::TraitItem>,
