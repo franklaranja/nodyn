@@ -12,9 +12,10 @@ use syn::{
 };
 
 #[derive(Debug, Clone)]
-pub(crate) struct MultiType {
+pub(crate) struct NodynEnum {
     pub(crate) attrs: Vec<Attribute>,
     pub(crate) visibility: Visibility,
+    pub(crate) _keyword: syn::token::Enum,
     pub(crate) ident: Ident,
     pub(crate) generics: Generics,
     pub(crate) variants: BTreeMap<String, Variant>,
@@ -22,11 +23,12 @@ pub(crate) struct MultiType {
     pub(crate) trait_blocks: Vec<TraitBlock>,
 }
 
-impl Parse for MultiType {
+impl Parse for NodynEnum {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut wrapper = Self {
             attrs: input.call(Attribute::parse_outer)?,
             visibility: input.parse::<Visibility>()?,
+            _keyword: input.parse::<syn::token::Enum>()?,
             ident: input.parse::<Ident>()?,
             generics: input.parse::<Generics>()?,
             variants: BTreeMap::new(),
@@ -62,7 +64,7 @@ impl Parse for MultiType {
     }
 }
 
-impl MultiType {
+impl NodynEnum {
     pub(crate) fn add_variant(&mut self, variant: Variant) -> syn::Result<()> {
         if let Entry::Vacant(entry) = self.variants.entry(variant.ident.to_string()) {
             entry.insert(variant);

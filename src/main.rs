@@ -3,7 +3,7 @@
 nodyn::wrap! {
   /// A test of the `wrap!` macro
   #[derive(Debug, PartialEq)]
-  pub Foo<'a, 'b> {
+  pub enum Foo<'a, 'b> {
         Bar<'a>,
         Bax(Xee<'b>),
   }

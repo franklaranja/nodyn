@@ -1,5 +1,5 @@
 error: This type can't be used
  --> tests/02_empty_and_type_errors.rs:5:9
   |
-5 |         * mut u32,
+5 |         *mut u32,
   |         ^

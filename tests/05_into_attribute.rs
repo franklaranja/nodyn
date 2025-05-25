@@ -3,7 +3,7 @@ use core::convert::TryFrom;
 nodyn::wrap! {
   /// A test of the `wrap!` macro
   #[derive(PartialEq, Debug, Clone)]
-  pub Foo<'a> {
+  pub enum Foo<'a> {
     i64,
     /// a &str
     &'a str,

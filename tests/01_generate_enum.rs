@@ -1,6 +1,6 @@
 nodyn::wrap! {
   #[derive(Debug)]
-  pub Foo<'a> {
+  pub enum Foo<'a> {
     I64,
     Str<'a>,
     F64,

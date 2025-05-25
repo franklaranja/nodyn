@@ -2,7 +2,7 @@ use core::convert::TryFrom;
 
 nodyn::wrap! {
     #[derive(PartialEq, Debug)]
-    pub Foo<'a> {
+    pub enum Foo<'a> {
         i64,
         &'a str,
         u32,

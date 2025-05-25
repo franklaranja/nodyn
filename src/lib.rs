@@ -25,12 +25,12 @@ use syn::spanned::Spanned;
 use syn::{parse_macro_input, TypeArray, TypePath, TypeReference, TypeSlice};
 
 mod impl_block;
-mod multi_type;
+mod nodyn_enum;
 mod trait_block;
 mod variant;
 
 pub(crate) use impl_block::ImplBlock;
-pub(crate) use multi_type::MultiType;
+pub(crate) use nodyn_enum::NodynEnum;
 pub(crate) use trait_block::TraitBlock;
 pub(crate) use variant::Variant;
 
@@ -46,7 +46,7 @@ pub(crate) use variant::Variant;
 /// ```
 /// nodyn::wrap!{
 ///    #[derive(Debug)]
-///    pub Foo<'a> {
+///    pub enum Foo<'a> {
 ///        i32,
 ///        String,
 ///        (u8, u8, u16),
@@ -78,7 +78,7 @@ pub(crate) use variant::Variant;
 ///
 /// nodyn::wrap! {
 ///     #[derive(PartialEq, Debug)]
-///     pub Foo<'a> {
+///     pub enum Foo<'a> {
 ///         i64,
 ///         &'a str,
 ///         u32,
@@ -105,7 +105,7 @@ pub(crate) use variant::Variant;
 ///
 #[proc_macro]
 pub fn wrap(input: TokenStream) -> TokenStream {
-    let multi_type = parse_macro_input!(input as MultiType);
+    let multi_type = parse_macro_input!(input as NodynEnum);
 
     let e_num = multi_type.generate_enum();
     let from = multi_type.generate_from();

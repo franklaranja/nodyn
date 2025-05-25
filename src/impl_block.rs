@@ -2,7 +2,7 @@ use proc_macro2::{Delimiter, Group, TokenStream, TokenTree};
 use quote::quote;
 use syn::{FnArg, ImplItem, parse::Parse, parse2};
 
-use crate::MultiType;
+use crate::NodynEnum;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
@@ -47,7 +47,7 @@ impl Parse for ImplBlock {
 }
 
 impl ImplBlock {
-    pub(crate) fn expand_methods(&self, wrapper: &MultiType) -> Vec<TokenStream> {
+    pub(crate) fn expand_methods(&self, wrapper: &NodynEnum) -> Vec<TokenStream> {
         self.functions
             .iter()
             .map(|f| {
