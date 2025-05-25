@@ -20,19 +20,19 @@
 //!     - does not generate method or trait implementations
 
 use proc_macro::TokenStream;
-use quote::{ToTokens, quote};
+use quote::{quote, ToTokens};
 use syn::spanned::Spanned;
-use syn::{TypeArray, TypePath, TypeReference, TypeSlice, parse_macro_input};
+use syn::{parse_macro_input, TypeArray, TypePath, TypeReference, TypeSlice};
 
 mod impl_block;
 mod multi_type;
 mod trait_block;
-mod types;
+mod variant;
 
 pub(crate) use impl_block::ImplBlock;
 pub(crate) use multi_type::MultiType;
 pub(crate) use trait_block::TraitBlock;
-pub(crate) use types::Type;
+pub(crate) use variant::Variant;
 
 /// # Generated code
 ///

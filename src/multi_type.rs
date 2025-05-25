@@ -1,20 +1,14 @@
-use super::ident_from_path;
-use super::path_from_type;
-use crate::{ImplBlock, TraitBlock, Type, syn_to_ident};
+use crate::Variant;
+use crate::{ImplBlock, TraitBlock};
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::btree_map::{BTreeMap, Entry};
-use syn::FnArg;
-use syn::TypeArray;
-use syn::TypePath;
-use syn::TypeReference;
-use syn::TypeSlice;
-use syn::TypeTuple;
 use syn::punctuated::Punctuated;
+use syn::FnArg;
 use syn::{
-    Attribute, Generics, Ident, Token, Visibility,
     parse::{Parse, ParseStream},
     spanned::Spanned,
+    Attribute, Generics, Ident, Token, Visibility,
 };
 
 #[derive(Debug, Clone)]
@@ -23,14 +17,13 @@ pub(crate) struct MultiType {
     pub(crate) visibility: Visibility,
     pub(crate) ident: Ident,
     pub(crate) generics: Generics,
-    pub(crate) variants: BTreeMap<String, Type>,
+    pub(crate) variants: BTreeMap<String, Variant>,
     pub(crate) impl_blocks: Vec<ImplBlock>,
     pub(crate) trait_blocks: Vec<TraitBlock>,
 }
 
 impl Parse for MultiType {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let content;
         let mut wrapper = Self {
             attrs: input.call(Attribute::parse_outer)?,
             visibility: input.parse::<Visibility>()?,
@@ -41,57 +34,11 @@ impl Parse for MultiType {
             trait_blocks: Vec::new(),
         };
 
+        let content;
         let _brace_token = syn::braced!(content in input);
-        while !content.is_empty() {
-            let attrs = content.call(Attribute::parse_outer)?;
-            let ty = content.parse::<syn::Type>()?;
-            let _ = content.parse::<Token![,]>();
-            match &ty {
-                syn::Type::Path(TypePath { path, .. }) => {
-                    wrapper.add_variant(ident_from_path(path, ""), ty, attrs)?;
-                }
-                syn::Type::Reference(TypeReference { elem, .. }) => {
-                    if let Some(path) = path_from_type(elem) {
-                        wrapper.add_variant(ident_from_path(path, "Ref"), ty, attrs)?;
-                    } else {
-                        return Err(syn::Error::new(ty.span(), "This type can't be used"));
-                    }
-                }
-                syn::Type::Array(TypeArray { elem, len, .. }) => {
-                    let ext = format!("Array{}", syn_to_ident(len));
-                    if let Some(path) = path_from_type(elem) {
-                        wrapper.add_variant(ident_from_path(path, &ext), ty, attrs)?;
-                    } else {
-                        return Err(syn::Error::new(ty.span(), "This type can't be used"));
-                    }
-                }
-                syn::Type::Slice(TypeSlice { elem, .. }) => {
-                    if let Some(path) = path_from_type(elem) {
-                        wrapper.add_variant(ident_from_path(path, "Slice"), ty, attrs)?;
-                    } else {
-                        return Err(syn::Error::new(ty.span(), "This type can't be used"));
-                    }
-                }
-                syn::Type::Tuple(TypeTuple { elems, .. }) => {
-                    let ident = elems
-                        .iter()
-                        .map(|t| path_from_type(t).map(|p| ident_from_path(p, "").to_string()))
-                        .collect::<Option<Vec<String>>>()
-                        .map(|mut v| {
-                            v.push("Tuple".to_string());
-                            Ident::new(&v.concat(), elems.span())
-                        });
-
-                    if let Some(i) = ident {
-                        wrapper.add_variant(i, ty, attrs)?;
-                    } else {
-                        return Err(syn::Error::new(ty.span(), "This type can't be used"));
-                    }
-                }
-                _ => {
-                    return Err(syn::Error::new(ty.span(), "This type can't be used"));
-                }
-            }
+        let variants = Punctuated::<Variant, Token![,]>::parse_terminated(&content)?;
+        for v in variants {
+            wrapper.add_variant(v)?;
         }
         loop {
             if input.peek(Token![impl]) {
@@ -116,44 +63,20 @@ impl Parse for MultiType {
 }
 
 impl MultiType {
-    pub(crate) fn add_variant(
-        &mut self,
-        ident: Ident,
-        ty: syn::Type,
-        attrs_in: Vec<Attribute>,
-    ) -> syn::Result<()> {
-        if let Entry::Vacant(entry) = self.variants.entry(ident.to_string()) {
-            let mut into = Vec::new();
-            let mut attrs = Vec::new();
-            for a in attrs_in {
-                if a.path().is_ident("into") {
-                    into = a
-                        .parse_args_with(Punctuated::<syn::Type, Token![,]>::parse_terminated)?
-                        .iter()
-                        .cloned()
-                        .collect();
-                } else {
-                    attrs.push(a);
-                }
-            }
-
-            entry.insert(Type {
-                ident,
-                ty,
-                attrs,
-                into,
-            });
+    pub(crate) fn add_variant(&mut self, variant: Variant) -> syn::Result<()> {
+        if let Entry::Vacant(entry) = self.variants.entry(variant.ident.to_string()) {
+            entry.insert(variant);
             Ok(())
         } else {
             Err(syn::Error::new(
-                ty.span(),
+                variant.ty.span(),
                 "Enum variant could not be generated, variant exists",
             ))
         }
     }
 
     pub(crate) fn enum_variants(&self) -> Vec<TokenStream> {
-        self.variants.values().map(Type::enum_variant).collect()
+        self.variants.values().map(Variant::enum_variant).collect()
     }
 
     pub(crate) fn generate_enum(&self) -> TokenStream {
