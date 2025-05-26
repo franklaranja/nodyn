@@ -18,11 +18,36 @@
 //!     - automatic `From` & `TryFrom`
 //!     - no lifetimes
 //!     - does not generate method or trait implementations
+//!
+//! # To do
+//!
+//! - [ ] make implementing `From` & `TryInto` optional
+//! - [ ] strum like `EnumCount`
+//!   ```ignore
+//!        pub trait EnumCount {
+//!            const COUNT: usize;
+//!        }
+//!    ```
+//! - [ ] strum like `VariantArray`
+//!   ```ignore
+//!        pub trait VariantArray: Sized + 'static {
+//!            const VARIANTS: &'static [Self];
+//!        }
+//!    ```
+//! - [ ] strum like `VariantNames`
+//!   ```ignore
+//!        pub trait VariantNames {
+//!            const VARIANTS: &'static [&'static str];
+//!        }
+//!    ```
+//! - [ ] strum like `EnumIs`: Generated `is_*()` methods for each variant.
+//! - [ ] strum like `TryAs`: Generated `try_as_*()` methods for all variants.
+//!
 
 use proc_macro::TokenStream;
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, TypeArray, TypePath, TypeReference, TypeSlice};
+use syn::{TypeArray, TypePath, TypeReference, TypeSlice, parse_macro_input};
 
 mod impl_block;
 mod nodyn_enum;
