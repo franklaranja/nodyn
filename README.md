@@ -1,72 +1,173 @@
 # nodyn
 
-A Rust proc macro to generate a enum wrapper for a set of types.
+The Rust `nodyn::`[`wrap!`] macro creates a wrapper enum for a set of
+types and can generate method and trait delegation.
 
-`nodyn::wrap!` creates an enum for a set of types and generates method
-and trait implementations. It can also generate collection types for
-the created `enum`.
+## Values of different Types in Rust
 
-## Generated code
+When we want to have values of different types in Rust there are
+two possible solutions: Trait Objects or Enum Wrappers. The second
+option is a "good solution when our interchangeable items are a
+fixed set of types that we know when our code is compiled"[^book].
 
-### Variant types and names
+### Example
 
-Only Path, Reference, Array, Slice and Tuple types are allowed. The
-variant names are created from the full path given converted
-to camel case. Reference types have 'Ref', Arrays 'Array' + length
-and Slices 'Slice' added.
+[Listing 8-9][Listing_8-9] from the book[^book]:
 
 ```rust
-nodyn::wrap!{
-   #[derive(Debug)]
-   pub Foo<'a> { i32, String, (u8, u8, u16), [bool;2], &'a str }
+    enum SpreadsheetCell {
+        Int(i32),
+        Float(f64),
+        Text(String),
+    }
+
+    let row = vec![
+        SpreadsheetCell::Int(3),
+        SpreadsheetCell::Text(String::from("blue")),
+        SpreadsheetCell::Float(10.12),
+    ];
+```
+
+With nodyn, which implements `From` for each wrapped type:
+
+```rust
+    nodyn::wrap! {
+        enum SpreadsheetCell { i32, f64, String }
+    }
+
+    let row: Vec<SpreadsheetCell> = vec![
+        3.into(),
+        String::from("blue").into(),
+        10.12.into(),
+    ];
+```
+
+## Downsides of Enum Wrappers
+
+However, using an Enum Wrapper requires extra code to delegate
+function calls. Adding types or functions requires a lot of changes
+to the Enum Wrapper, bigger changes in comparison to Trait Objects.
+The [`wrap!`] generates the delegation for you.
+
+### Example
+
+Here is [Listing 10-13][Listing_10-13] from the book[^book]:
+
+```rust
+   pub trait Summary {
+       fn summarize(&self) -> String;
+   }
+   
+   pub struct NewsArticle {
+       pub headline: String,
+       pub location: String,
+       pub author: String,
+       pub content: String,
+   }
+   
+   impl Summary for NewsArticle {
+       fn summarize(&self) -> String {
+           format!("{}, by {} ({})", self.headline, self.author, self.location)
+       }
+   }
+   
+   pub struct SocialPost {
+       pub username: String,
+       pub content: String,
+       pub reply: bool,
+       pub repost: bool,
+   }
+   
+   impl Summary for SocialPost {
+       fn summarize(&self) -> String {
+           format!("{}: {}", self.username, self.content)
+       }
+   }
+```
+
+We can create an enum Wrapper `Article` that implements `Summery`
+by delegating to `NewsArticle` or `SocialPost`:
+
+```rust
+# pub trait Summary {
+#     fn summarize(&self) -> String;
+# }
+#
+# pub struct NewsArticle {
+#     pub headline: String,
+#     pub location: String,
+#     pub author: String,
+#     pub content: String,
+# }
+#
+# impl Summary for NewsArticle {
+#     fn summarize(&self) -> String {
+#         format!("{}, by {} ({})", self.headline, self.author, self.location)
+#     }
+# }
+#
+# pub struct SocialPost {
+#     pub username: String,
+#     pub content: String,
+#     pub reply: bool,
+#     pub repost: bool,
+# }
+#
+# impl Summary for SocialPost {
+#     fn summarize(&self) -> String {
+#         format!("{}: {}", self.username, self.content)
+#     }
+# }
+
+nodyn::wrap! {
+    enum Article {NewsArticle, SocialPost}
+
+    trait Summary {
+        fn summarize(&self) -> String;
+    }
 }
 ```
 
-generates
+See the documentation of the [`wrap!`] macro for details.
 
-```rust
-#[derive(Debug)]
-pub enum Foo {
-    I32(i32),
-    String(String),
-    U8U8U16Tuple((u8,u8,u16)),
-    BoolArray4,
-    StrRef(&'a str),
-}
+## Alternative crates
 
-## Automatic generated trait implementations
+- **[enum_dispatch]**
+    - can only generate delegation for traits in scope
+      (but in a very convenient way).
+- **[sum_type]**
+    - very limited to the type of types being wrapped (e.g. no lifetimes)
+    - no delegation
 
-1. `From<T> for Wrapper` for all variant types
-2. `TryFrom<Wrapper> for T` automatic for all non reference types
+[enum_dispatch]: https://crates.io/crates/enum_dispatch
+[sum_type]: https://crates.io/crates/sum_type 
 
-   When `T` has a `From<O>` implementation then you can add the
-   attribute `#[into(T)]` to `O` and it will return a `Some(T)` for it.
+## To do
 
-## Function delegation
+- [ ] strum like `EnumCount`
+  ```ignore
+       pub trait EnumCount {
+           const COUNT: usize;
+       }
+   ```
+- [ ] strum like `VariantArray`
+  ```ignore
+       pub trait VariantArray: Sized + 'static {
+           const VARIANTS: &'static [Self];
+       }
+   ```
+- [ ] strum like `VariantNames`
+  ```ignore
+       pub trait VariantNames {
+           const VARIANTS: &'static [&'static str];
+       }
+   ```
+- [ ] strum like `EnumIs`: Generated `is_*()` methods for each variant.
+- [ ] strum like `TryAs`: Generated `try_as_*()` methods for all variants.
 
-When all types included implement a method, a delegation method
-can be generated by including the method definition with the
-block replaced by a semicolon in `impl`.
+[^book]: "The Rust Programming Language" by Steve Klabnik, Carol Nichols, and Chris Krycho, with contributions from the Rust Community
 
-## Trait implementation
-
-When all types included implement a trait. Delegation functions for
-
-
-## Generating
-
-- **`enum_dispatch`**
-    - uses procedural macros
-    - automatic `From` & `TryInto`
-    - crate defined traits
-    - only generate trait implementations for traits in scope
-      in a very conveniant way.
-- **`sum_type`**
-    - declaritative macros
-    - automatic `From` & `TryFrom`
-    - no lifetimes
-    - does not generate method or trait implementations
-
-
+[Listing_8-9]: http://localhost:3000/share/rust/html/book/ch08-01-vectors.html#listing-8-9
+[Listing_10-13]: http://localhost:3000/share/rust/html/book/ch10-02-traits.html#listing-10-13
 
 License: MIT
