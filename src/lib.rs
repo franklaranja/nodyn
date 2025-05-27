@@ -122,7 +122,7 @@
 //! nodyn::wrap! {
 //!     enum Article {NewsArticle, SocialPost}
 //!
-//!     trait Summary {
+//!     impl Summary {
 //!         fn summarize(&self) -> String;
 //!     }
 //! }
@@ -170,9 +170,9 @@
 //! [Listing_10-13]: http://localhost:3000/share/rust/html/book/ch10-02-traits.html#listing-10-13
 
 use proc_macro::TokenStream;
-use quote::{ToTokens, quote};
+use quote::{quote, ToTokens};
 use syn::spanned::Spanned;
-use syn::{TypeArray, TypePath, TypeReference, TypeSlice, parse_macro_input};
+use syn::{parse_macro_input, TypeArray, TypePath, TypeReference, TypeSlice};
 
 mod impl_block;
 mod nodyn_enum;
@@ -274,7 +274,7 @@ pub(crate) use variant::Variant;
 ///
 /// ## Trait implementation
 ///
-/// When all types included implemen a trait. The trait can be implemented
+/// When all types included implement a trait. The trait can be implemented
 /// for the wrapper:
 ///
 #[proc_macro]

@@ -23,15 +23,10 @@ impl TraitBlock {
 
 impl Parse for TraitBlock {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let _keyword = input.parse::<syn::token::Trait>()?;
-        let ident = input.parse::<Ident>()?;
-        let generics = input.parse::<Generics>()?;
-
-        let block = input.parse::<ImplBlock>()?;
         Ok(Self {
-            ident,
-            generics,
-            block,
+            ident: input.parse::<Ident>()?,
+            generics: input.parse::<Generics>()?,
+            block: input.parse::<ImplBlock>()?,
         })
     }
 }

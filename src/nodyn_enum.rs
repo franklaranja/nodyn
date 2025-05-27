@@ -45,13 +45,16 @@ impl Parse for NodynEnum {
         loop {
             if input.peek(Token![impl]) {
                 let _keyword = input.parse::<syn::token::Impl>()?;
-                wrapper.impl_blocks.push(input.parse::<ImplBlock>()?);
-            } else if input.peek(Token![trait]) {
-                wrapper.trait_blocks.push(input.parse::<TraitBlock>()?);
+                // impl of a trait if followed by an identi
+                if input.peek(Ident) {
+                    wrapper.trait_blocks.push(input.parse::<TraitBlock>()?);
+                } else {
+                    wrapper.impl_blocks.push(input.parse::<ImplBlock>()?);
+                }
             } else if !input.is_empty() {
                 return Err(syn::Error::new(
                     input.lookahead1().error().span(),
-                    "only 'impl' and 'trait' itemd are supported",
+                    "only 'impl' items are supported",
                 ));
             } else {
                 break;

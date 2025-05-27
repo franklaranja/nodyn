@@ -14,7 +14,7 @@ nodyn::wrap! {
         }
   }
 
-  trait Say {
+  impl Say {
         fn say(&self, f: &str) -> String;
   }
 }
