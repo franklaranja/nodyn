@@ -207,4 +207,43 @@ impl NodynEnum {
             })
             .collect()
     }
+
+    pub(crate) fn generate_type_to_str(&self) -> TokenStream {
+        let wrapper = &self.ident;
+        let lt = &self.generics;
+        let vis = &self.visibility;
+        let names = self
+            .variants
+            .values()
+            .map(Variant::type_as_string)
+            .collect::<Vec<_>>();
+        let count = names.len();
+        let arms = self
+            .variants
+            .values()
+            .map(|v| v.type_as_str_arm(&self.ident))
+            .collect::<Vec<_>>();
+        quote! {
+            impl #lt #wrapper #lt {
+                /// Returns the number of types (variants)
+                #vis const fn count() -> usize { #count }
+
+                /// Returns an array with the types as `&str`s.
+                /// If the type is a reference there will be a space
+                /// between the & and '.
+                #vis const fn types() -> [&'static str;#count] {
+                    [ #(#names ,)*]
+                }
+
+                /// returns the type as a `&str` of the variant.
+                /// If the type is a reference there will be a space
+                /// between the & and '.
+                #vis const fn  ty(&self) -> &'static str {
+                    match self {
+                        #(#arms)*
+                    }
+                }
+            }
+        }
+    }
 }

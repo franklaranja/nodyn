@@ -17,7 +17,6 @@ pub(crate) struct Variant {
 
 impl Variant {
     pub(crate) fn enum_variant(&self) -> TokenStream {
-        // let variants = content.parse_terminated::<Punctuated<Variant, Token![,]>>()?;
         let attrs = &self.attrs;
         let ty = &self.ty;
         let ident = &self.ident;
@@ -63,6 +62,18 @@ impl Variant {
         quote! {
             #wrapper::#ident(value) =>  value.#function( #args ),
         }
+    }
+
+    pub(crate) fn type_as_str_arm(&self, wrapper: &Ident) -> TokenStream {
+        let type_string = self.type_as_string();
+        let ident = &self.ident;
+        quote! {
+            #wrapper::#ident(_) => #type_string,
+        }
+    }
+
+    pub(crate) fn type_as_string(&self) -> String {
+        self.ty.clone().into_token_stream().to_string()
     }
 }
 
