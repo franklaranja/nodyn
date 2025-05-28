@@ -309,6 +309,7 @@ pub fn wrap(input: TokenStream) -> TokenStream {
     let impl_blocks = nodyn_enum.generate_impl_blocks();
     let trait_blocks = nodyn_enum.generate_trait_blocks();
     let type_fns = nodyn_enum.generate_type_to_str();
+    let is_as_fn = nodyn_enum.generate_is_as().unwrap();
 
     let expanded = quote! {
         #e_num
@@ -317,6 +318,7 @@ pub fn wrap(input: TokenStream) -> TokenStream {
         #(#impl_blocks)*
         #(#trait_blocks)*
         #type_fns
+        #is_as_fn
     };
 
     TokenStream::from(expanded)

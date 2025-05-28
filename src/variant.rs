@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{
     parenthesized, parse::Parse, punctuated::Punctuated, spanned::Spanned, token::Comma, Attribute,
-    FnArg, Ident, Token, TypeArray, TypePath, TypeReference, TypeSlice, TypeTuple,
+    FnArg, Ident, Token, Type, TypeArray, TypePath, TypeReference, TypeSlice, TypeTuple,
 };
 
 use crate::{ident_from_path, path_from_type, syn_to_ident};
@@ -72,8 +72,50 @@ impl Variant {
         }
     }
 
+    pub(crate) fn is_a_arm(&self, wrapper: &Ident, ty: &Type) -> TokenStream {
+        let ident = &self.ident;
+        if &self.ty == ty {
+            quote! { #wrapper::#ident(_) => true, }
+        } else {
+            quote! {}
+        }
+    }
+
+    pub(crate) fn as_arm(&self, wrapper: &Ident, ty: &Type) -> TokenStream {
+        let ident = &self.ident;
+        if &self.ty == ty {
+            quote! { #wrapper::#ident(value) => Some(value), }
+        } else if self.into.contains(ty) {
+            quote! { #wrapper::#ident(value) => Some(value.into()),}
+        } else {
+            quote! {}
+        }
+    }
+
+    pub(crate) fn as_ref_arm(&self, wrapper: &Ident, ty: &Type) -> TokenStream {
+        let ident = &self.ident;
+        if &self.ty == ty {
+            quote! { #wrapper::#ident(value) => Some(value), }
+        } else {
+            quote! {}
+        }
+    }
+
+    pub(crate) fn as_mut_arm(&self, wrapper: &Ident, ty: &Type) -> TokenStream {
+        let ident = &self.ident;
+        if &self.ty == ty {
+            quote! { #wrapper::#ident(value) => Some(value), }
+        } else {
+            quote! {}
+        }
+    }
+
     pub(crate) fn type_as_string(&self) -> String {
         self.ty.clone().into_token_stream().to_string()
+    }
+
+    pub(crate) fn ident_as_snake(&self) -> String {
+        camel_to_snake(&self.ident.to_string())
     }
 }
 
@@ -160,4 +202,21 @@ fn no_ident_err(ty: &syn::Type) -> syn::Result<Ident> {
         ty.span(),
         "This type can't be used, try defining the variant name",
     ))
+}
+
+fn camel_to_snake(camel: &str) -> String {
+    let mut snake = String::new();
+    let mut first = true;
+    for c in camel.chars() {
+        if c.is_uppercase() {
+            if !first {
+                snake.push('_');
+            }
+            snake.push_str(&c.to_lowercase().to_string());
+        } else {
+            snake.push(c);
+        }
+        first = false;
+    }
+    snake
 }

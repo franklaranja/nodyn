@@ -3,12 +3,11 @@ use crate::{ImplBlock, TraitBlock};
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::btree_map::{BTreeMap, Entry};
-use syn::punctuated::Punctuated;
-use syn::FnArg;
 use syn::{
     parse::{Parse, ParseStream},
+    punctuated::Punctuated,
     spanned::Spanned,
-    Attribute, Generics, Ident, Token, Visibility,
+    Attribute, FnArg, Generics, Ident, Token, Visibility,
 };
 
 #[derive(Debug, Clone)]
@@ -245,5 +244,90 @@ impl NodynEnum {
                 }
             }
         }
+    }
+
+    // TODO: skip as_ref for reference types
+    // - function as try_as_   _ref/mut
+    pub(crate) fn generate_is_as(&self) -> syn::Result<TokenStream> {
+        let wrapper = &self.ident;
+        let lt = &self.generics;
+        let fns = self
+            .variants
+            .values()
+            .map(|v| {
+                // let ident = &v.ident;
+                let ty = &v.ty;
+                let snake = v.ident_as_snake();
+                let type_name = v.type_as_string();
+
+                let is_a_arms = self
+                    .variants
+                    .values()
+                    .map(|i| i.is_a_arm(&wrapper, &ty))
+                    .collect::<Vec<_>>();
+                let is_fn = Ident::new(&format!("is_{snake}"), ty.span());
+                let is_a_doc = &format!("Returns true if the variant is a {type_name}>");
+
+                let as_arms = self
+                    .variants
+                    .values()
+                    .map(|i| i.as_arm(&wrapper, &ty))
+                    .collect::<Vec<_>>();
+                let as_fn = Ident::new(&format!("try_as_{snake}"), ty.span());
+                let as_doc = &format!("Returns the variant as an Option<{type_name}>");
+
+                let as_ref_arms = self
+                    .variants
+                    .values()
+                    .map(|i| i.as_ref_arm(&wrapper, &ty))
+                    .collect::<Vec<_>>();
+                let as_ref_fn = Ident::new(&format!("try_as_{snake}_ref"), ty.span());
+                let as_ref_doc = &format!("Returns the variant as an Option<&{type_name}>");
+
+                let as_mut_arms = self
+                    .variants
+                    .values()
+                    .map(|i| i.as_mut_arm(&wrapper, &ty))
+                    .collect::<Vec<_>>();
+                let as_mut_fn = Ident::new(&format!("try_as_{snake}_mut"), ty.span());
+                let as_mut_doc = &format!("Returns the variant as an Option<&mut {type_name}>");
+
+                Ok(quote! {
+                    #[doc = #is_a_doc]
+                    fn #is_fn(&self) -> bool {
+                        match self {
+                            #(#is_a_arms)*
+                            _ => false,
+                        }
+                    }
+                    #[doc = #as_doc]
+                    fn #as_fn(self) -> Option< #ty > {
+                        match self {
+                            #(#as_arms)*
+                            _ => None,
+                        }
+                    }
+                    #[doc = #as_ref_doc]
+                    fn #as_ref_fn(&self) -> Option<&#ty> {
+                        match self {
+                            #(#as_ref_arms)*
+                            _ => None,
+                        }
+                    }
+                    #[doc = #as_mut_doc]
+                    fn #as_mut_fn(&mut self) -> Option<&mut #ty> {
+                        match self {
+                            #(#as_mut_arms)*
+                            _ => None,
+                        }
+                    }
+                })
+            })
+            .collect::<syn::Result<Vec<_>>>()?;
+        Ok(quote! {
+            impl #lt #wrapper #lt {
+                #(#fns)*
+            }
+        })
     }
 }
