@@ -1,18 +1,21 @@
-# nodyn
 
 The Rust `nodyn::`[`wrap!`] macro creates a wrapper enum for a set of
 types and can generate method and trait delegation.
 
-## Values of different Types in Rust
+TODO: nice example demonstrating all features
+
+# Values of different Types in Rust
 
 When we want to have values of different types in Rust there are
 two possible solutions: Trait Objects or Enum Wrappers. The second
 option is a "good solution when our interchangeable items are a
 fixed set of types that we know when our code is compiled"[^book].
+// /html/book/ch18-02-trait-objects.html#using-trait-objects-that-allow-for-values-of-different-types
 
-### Example
+## Example
 
 [Listing 8-9][Listing_8-9] from the book[^book]:
+// /html/book/ch08-01-vectors.html#using-an-enum-to-store-multiple-types
 
 ```rust
     enum SpreadsheetCell {
@@ -42,14 +45,19 @@ With nodyn, which implements `From` for each wrapped type:
     ];
 ```
 
-## Downsides of Enum Wrappers
+The advantage of `enum` wrappers over trait objects is that there
+is no type erasure and its faster.
 
-However, using an Enum Wrapper requires extra code to delegate
+# Downside of Enum Wrappers
+
+However, using an `enum` wrapper requires extra code to delegate
 function calls. Adding types or functions requires a lot of changes
-to the Enum Wrapper, bigger changes in comparison to Trait Objects.
-The [`wrap!`] generates the delegation for you.
+to the enum wrapper, bigger changes in comparison to trait objects.
+The [`wrap!`] macro generates the delegations and you get easy
+wrapping and unwrapping with automatic implementations of
+the `From` and `TryFrom` traits.
 
-### Example
+## Example
 
 Here is [Listing 10-13][Listing_10-13] from the book[^book]:
 
@@ -100,7 +108,7 @@ nodyn::wrap! {
 
 See the documentation of the [`wrap!`] macro for details.
 
-## Alternative crates
+# Alternative crates
 
 - **[enum_dispatch]**
     - can only generate delegation for traits in scope
@@ -110,34 +118,9 @@ See the documentation of the [`wrap!`] macro for details.
     - no delegation
 
 [enum_dispatch]: https://crates.io/crates/enum_dispatch
-[sum_type]: https://crates.io/crates/sum_type 
-
-## To do
-
-- [ ] strum like `EnumCount`
-  ```ignore
-       pub trait EnumCount {
-           const COUNT: usize;
-       }
-   ```
-- [ ] strum like `VariantArray`
-  ```ignore
-       pub trait VariantArray: Sized + 'static {
-           const VARIANTS: &'static [Self];
-       }
-   ```
-- [ ] strum like `VariantNames`
-  ```ignore
-       pub trait VariantNames {
-           const VARIANTS: &'static [&'static str];
-       }
-   ```
-- [ ] strum like `EnumIs`: Generated `is_*()` methods for each variant.
-- [ ] strum like `TryAs`: Generated `try_as_*()` methods for all variants.
+[sum_type]: https://crates.io/crates/sum_type
 
 [^book]: "The Rust Programming Language" by Steve Klabnik, Carol Nichols, and Chris Krycho, with contributions from the Rust Community
 
 [Listing_8-9]: http://localhost:3000/share/rust/html/book/ch08-01-vectors.html#listing-8-9
 [Listing_10-13]: http://localhost:3000/share/rust/html/book/ch10-02-traits.html#listing-10-13
-
-License: MIT
