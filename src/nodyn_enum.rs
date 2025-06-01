@@ -238,7 +238,7 @@ impl NodynEnum {
                 /// returns the type as a `&str` of the variant.
                 /// If the type is a reference there will be a space
                 /// between the & and '.
-                #vis const fn  ty(&self) -> &'static str {
+                #vis const fn  type_name(&self) -> &'static str {
                     match self {
                         #(#arms)*
                     }

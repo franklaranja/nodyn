@@ -238,7 +238,7 @@
 //!
 //! // Get type name of current value
 //! let val: Value = 42.into();
-//! assert_eq!(val.ty(), "i32");
+//! assert_eq!(val.type_name(), "i32");
 //! ```
 //!
 //! ## Type Checking and Conversion Methods
@@ -340,21 +340,12 @@
 //!         fn len(&self) -> usize;
 //!         fn is_empty(&self) -> bool;
 //!         fn clear(&mut self);
-//!         
-//!         // Add custom methods
-//!         fn type_name(&self) -> &'static str {
-//!             match self {
-//!                 Self::String(_) => "String",
-//!                 Self::VecU8(_) => "Vec<u8>",
-//!             }
-//!         }
 //!     }
 //! }
 //!
 //! let mut container: Container = "hello".to_string().into();
 //! assert_eq!(container.len(), 5);
 //! assert!(!container.is_empty());
-//! assert_eq!(container.type_name(), "String");
 //! ```
 //!
 //! # Trait Implementation
