@@ -1,12 +1,13 @@
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
+use quote::{quote, ToTokens};
 use syn::{
-    Attribute, FnArg, Ident, Token, Type, TypeArray, TypePath, TypeReference, TypeSlice, TypeTuple,
     parenthesized,
     parse::Parse,
     punctuated::Punctuated,
     spanned::Spanned,
     token::{Comma, Paren},
+    Attribute, FnArg, GenericArgument, Ident, PathArguments, Token, Type, TypeArray, TypePath,
+    TypeReference, TypeSlice, TypeTuple,
 };
 
 #[derive(Debug, Clone)]
@@ -37,8 +38,8 @@ impl Variant {
         } else {
             let message = format!(
                 "No conversion from '{}' to {}",
-                self.ty.to_token_stream(),
-                other.ty.to_token_stream()
+                self.type_as_string(),
+                other.type_as_string()
             );
             quote! { #wrapper::#ident(_) => Err(#message), }
         }
@@ -113,7 +114,14 @@ impl Variant {
     }
 
     pub(crate) fn type_as_string(&self) -> String {
-        self.ty.clone().into_token_stream().to_string()
+        self.ty
+            .clone()
+            .into_token_stream()
+            .to_string()
+            .replace("& '", "&'")
+            .replace(" < ", "<")
+            .replace(" > ", ">")
+            .replace(" >", ">")
     }
 
     pub(crate) fn ident_as_snake(&self) -> String {
@@ -229,10 +237,34 @@ fn ident_from_path(p: &syn::Path, extension: &str) -> Ident {
         .iter()
         .map(|p| {
             let ident = p.ident.to_string();
+            let extra_idents = if let PathArguments::AngleBracketed(args) = &p.arguments {
+                let idents = args
+                    .args
+                    .iter()
+                    .filter_map(|a| match a {
+                        GenericArgument::Type(t) => Some(ident_from_type(t).map(|i| i.to_string())),
+                        GenericArgument::AssocType(t) => {
+                            Some(ident_from_type(&t.ty).map(|i| i.to_string()))
+                        }
+                        _ => None,
+                    })
+                    .collect::<syn::Result<Vec<_>>>();
+                if let Ok(vec) = idents {
+                    vec.concat()
+                } else {
+                    String::new()
+                }
+            } else {
+                String::new()
+            };
             let mut chars = ident.chars();
-            chars
-                .next()
-                .map(|first| format!("{}{}{extension}", first.to_uppercase(), chars.as_str()))
+            chars.next().map(|first| {
+                format!(
+                    "{}{}{extra_idents}{extension}",
+                    first.to_uppercase(),
+                    chars.as_str()
+                )
+            })
         })
         .collect();
     idents

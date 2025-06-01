@@ -176,7 +176,9 @@ pub(crate) use variant::Variant;
 /// Only Path, Reference, Array, Slice and Tuple types are supported. The
 /// variant names are created from the full path given converted
 /// to camel case. Reference types have 'Ref', Arrays 'Array' + length
-/// and Slices 'Slice' added.
+/// and Slices 'Slice' added. If a path type has angle bracketed arguments
+/// the generic types and types of associated types are appended to the
+/// variant name.
 ///
 /// ```
 /// nodyn::wrap!{

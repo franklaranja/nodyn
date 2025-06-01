@@ -17,7 +17,7 @@ fn main() {
     assert_eq!(Foo::count(), 5usize);
     assert_eq!(
         Foo::types(),
-        ["i64", "& 'a str", "u32", "[u8; 4]", "Vec < String >"]
+        ["i64", "&'a str", "u32", "[u8; 4]", "Vec<String>"]
     );
-    assert_eq!(t.ty(), "& 'a str")
+    assert_eq!(t.ty(), "&'a str")
 }

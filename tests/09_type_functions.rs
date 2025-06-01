@@ -14,6 +14,6 @@ nodyn::wrap! {
 fn main() {
     let t: Foo = "hello world".into();
     assert_eq!(Foo::count(), 4usize);
-    assert_eq!(Foo::types(), ["i64", "& 'a str", "u32", "[u8; 4]"]);
-    assert_eq!(t.ty(), "& 'a str")
+    assert_eq!(Foo::types(), ["i64", "&'a str", "u32", "[u8; 4]"]);
+    assert_eq!(t.ty(), "&'a str")
 }
