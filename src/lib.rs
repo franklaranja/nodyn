@@ -234,7 +234,7 @@
 //! assert_eq!(Value::count(), 3);
 //!
 //! // Array of type names
-//! assert_eq!(Value::types(), ["f64", "i32", "String"]);
+//! assert_eq!(Value::types(), [ "i32", "String", "f64"]);
 //!
 //! // Get type name of current value
 //! let val: Value = 42.into();

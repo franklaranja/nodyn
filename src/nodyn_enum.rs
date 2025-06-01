@@ -2,7 +2,7 @@ use crate::Variant;
 use crate::{ImplBlock, TraitBlock};
 use proc_macro2::TokenStream;
 use quote::quote;
-use std::collections::btree_map::{BTreeMap, Entry};
+use std::collections::HashSet;
 use syn::Type;
 use syn::{
     parse::{Parse, ParseStream},
@@ -18,7 +18,8 @@ pub(crate) struct NodynEnum {
     pub(crate) _keyword: syn::token::Enum,
     pub(crate) ident: Ident,
     pub(crate) generics: Generics,
-    pub(crate) variants: BTreeMap<String, Variant>,
+    //pub(crate) variants: BTreeMap<String, Variant>,
+    pub(crate) variants: Vec<Variant>,
     pub(crate) impl_blocks: Vec<ImplBlock>,
     pub(crate) trait_blocks: Vec<TraitBlock>,
 }
@@ -31,16 +32,25 @@ impl Parse for NodynEnum {
             _keyword: input.parse::<syn::token::Enum>()?,
             ident: input.parse::<Ident>()?,
             generics: input.parse::<Generics>()?,
-            variants: BTreeMap::new(),
+            variants: Vec::new(),
             impl_blocks: Vec::new(),
             trait_blocks: Vec::new(),
         };
 
+        let mut existing_types = HashSet::new();
         let content;
         let _brace_token = syn::braced!(content in input);
         let variants = Punctuated::<Variant, Token![,]>::parse_terminated(&content)?;
-        for v in variants {
-            wrapper.add_variant(v)?;
+        for variant in variants {
+            if !existing_types.contains(&variant.ty) {
+                existing_types.insert(variant.ty.clone());
+                wrapper.variants.push(variant)
+            } else {
+                return Err(syn::Error::new(
+                    variant.ty.span(),
+                    "Enum variant could not be generated, variant exists",
+                ));
+            }
         }
         loop {
             if input.peek(Token![impl]) {
@@ -68,20 +78,8 @@ impl Parse for NodynEnum {
 }
 
 impl NodynEnum {
-    pub(crate) fn add_variant(&mut self, variant: Variant) -> syn::Result<()> {
-        if let Entry::Vacant(entry) = self.variants.entry(variant.ident.to_string()) {
-            entry.insert(variant);
-            Ok(())
-        } else {
-            Err(syn::Error::new(
-                variant.ty.span(),
-                "Enum variant could not be generated, variant exists",
-            ))
-        }
-    }
-
     pub(crate) fn enum_variants(&self) -> Vec<TokenStream> {
-        self.variants.values().map(Variant::enum_variant).collect()
+        self.variants.iter().map(Variant::enum_variant).collect()
     }
 
     pub(crate) fn generate_enum(&self) -> TokenStream {
@@ -103,7 +101,7 @@ impl NodynEnum {
         let wrapper = &self.ident;
         let lt = &self.generics;
         self.variants
-            .values()
+            .iter()
             .map(|v| {
                 let ident = &v.ident;
                 let ty = &v.ty;
@@ -122,12 +120,12 @@ impl NodynEnum {
         let wrapper = &self.ident;
         let lt = &self.generics;
         self.variants
-            .values()
+            .iter()
             .map(|outer| {
                 let ty = &outer.ty;
                 let branches: Vec<TokenStream> = self
                     .variants
-                    .values()
+                    .iter()
                     .map(|inner| inner.try_from_arm(outer, wrapper))
                     .collect();
                 quote! {
@@ -159,7 +157,7 @@ impl NodynEnum {
                         if let Some(FnArg::Receiver(_)) = f.sig.inputs.first() {
                             let arms = self
                                 .variants
-                                .values()
+                                .iter()
                                 .map(|v| v.fn_call(&self.ident, &f.sig.ident, &f.sig.inputs));
                             let attrs = &f.attrs;
                             let vis = &f.vis;
@@ -214,13 +212,13 @@ impl NodynEnum {
         let vis = &self.visibility;
         let names = self
             .variants
-            .values()
+            .iter()
             .map(Variant::type_as_string)
             .collect::<Vec<_>>();
         let count = names.len();
         let arms = self
             .variants
-            .values()
+            .iter()
             .map(|v| v.type_as_str_arm(&self.ident))
             .collect::<Vec<_>>();
         quote! {
@@ -254,7 +252,7 @@ impl NodynEnum {
         let lt = &self.generics;
         let fns = self
             .variants
-            .values()
+            .iter()
             .map(|v| {
                 // let ident = &v.ident;
                 let ty = &v.ty;
@@ -263,7 +261,7 @@ impl NodynEnum {
 
                 let is_a_arms = self
                     .variants
-                    .values()
+                    .iter()
                     .map(|i| i.is_a_arm(&wrapper, &ty))
                     .collect::<Vec<_>>();
                 let is_fn = Ident::new(&format!("is_{snake}"), ty.span());
@@ -271,7 +269,7 @@ impl NodynEnum {
 
                 let as_arms = self
                     .variants
-                    .values()
+                    .iter()
                     .map(|i| i.as_arm(&wrapper, &ty))
                     .collect::<Vec<_>>();
                 let as_fn = Ident::new(&format!("try_as_{snake}"), ty.span());
@@ -282,7 +280,7 @@ impl NodynEnum {
                 } else {
                     let as_ref_arms = self
                         .variants
-                        .values()
+                        .iter()
                         .map(|i| i.as_ref_arm(&wrapper, &ty))
                         .collect::<Vec<_>>();
                     let as_ref_fn = Ident::new(&format!("try_as_{snake}_ref"), ty.span());
@@ -290,7 +288,7 @@ impl NodynEnum {
 
                     let as_mut_arms = self
                         .variants
-                        .values()
+                        .iter()
                         .map(|i| i.as_mut_arm(&wrapper, &ty))
                         .collect::<Vec<_>>();
                     let as_mut_fn = Ident::new(&format!("try_as_{snake}_mut"), ty.span());

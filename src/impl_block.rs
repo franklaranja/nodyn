@@ -1,6 +1,6 @@
 use proc_macro2::{Delimiter, Group, TokenStream, TokenTree};
 use quote::quote;
-use syn::{FnArg, ImplItem, parse::Parse, parse2};
+use syn::{parse::Parse, parse2, FnArg, ImplItem};
 
 use crate::NodynEnum;
 
@@ -54,7 +54,7 @@ impl ImplBlock {
                 if let Some(FnArg::Receiver(_)) = f.sig.inputs.first() {
                     let arms = wrapper
                         .variants
-                        .values()
+                        .iter()
                         .map(|v| v.fn_call(&wrapper.ident, &f.sig.ident, &f.sig.inputs));
                     let attrs = &f.attrs;
                     let vis = &f.vis;
