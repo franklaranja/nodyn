@@ -155,9 +155,8 @@
 //! [Listing_10-13]: http://localhost:3000/share/rust/html/book/ch10-02-traits.html#listing-10-13
 
 use proc_macro::TokenStream;
-use quote::{quote, ToTokens};
-use syn::spanned::Spanned;
-use syn::{parse_macro_input, TypeArray, TypePath, TypeReference, TypeSlice};
+use quote::quote;
+use syn::parse_macro_input;
 
 mod impl_block;
 mod nodyn_enum;
@@ -345,50 +344,4 @@ pub fn wrap(input: TokenStream) -> TokenStream {
     };
 
     TokenStream::from(expanded)
-}
-
-fn ident_from_path(p: &syn::Path, extension: &str) -> syn::Ident {
-    let idents: Option<Vec<String>> = p
-        .segments
-        .iter()
-        .map(|p| {
-            let ident = p.ident.to_string();
-            let mut chars = ident.chars();
-            chars
-                .next()
-                .map(|first| format!("{}{}{extension}", first.to_uppercase(), chars.as_str()))
-        })
-        .collect();
-    idents
-        .map(|s| syn::Ident::new(&s.concat(), p.span()))
-        .expect("Could not generate ident")
-}
-
-fn syn_to_ident<T: ToTokens>(t: T) -> String {
-    let input = t.to_token_stream().to_string();
-    input
-        .split_whitespace()
-        .map(|word| {
-            let filtered = word
-                .chars()
-                .filter(|c| c.is_alphanumeric())
-                .collect::<String>();
-            let mut chars = filtered.chars();
-            chars
-                .next()
-                .map(|first| format!("{}{}", first.to_uppercase(), chars.as_str()))
-                .expect("Could not uppercase first letter")
-        })
-        .collect::<Vec<String>>()
-        .concat()
-}
-
-fn path_from_type(ty: &syn::Type) -> Option<&syn::Path> {
-    match ty {
-        syn::Type::Path(TypePath { path, .. }) => Some(path),
-        syn::Type::Reference(TypeReference { elem, .. })
-        | syn::Type::Array(TypeArray { elem, .. })
-        | syn::Type::Slice(TypeSlice { elem, .. }) => path_from_type(elem),
-        _ => None,
-    }
 }

@@ -1,18 +1,20 @@
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use syn::{
-    parenthesized, parse::Parse, punctuated::Punctuated, spanned::Spanned, token::Comma, Attribute,
-    FnArg, Ident, Token, Type, TypeArray, TypePath, TypeReference, TypeSlice, TypeTuple,
+    Attribute, FnArg, Ident, Token, Type, TypeArray, TypePath, TypeReference, TypeSlice, TypeTuple,
+    parenthesized,
+    parse::Parse,
+    punctuated::Punctuated,
+    spanned::Spanned,
+    token::{Comma, Paren},
 };
-
-use crate::{ident_from_path, path_from_type, syn_to_ident};
 
 #[derive(Debug, Clone)]
 pub(crate) struct Variant {
     pub(crate) attrs: Vec<Attribute>,
-    pub(crate) into: Vec<syn::Type>,
+    pub(crate) into: Vec<Type>,
     pub(crate) ident: Ident,
-    pub(crate) ty: syn::Type,
+    pub(crate) ty: Type,
 }
 
 impl Variant {
@@ -122,11 +124,11 @@ impl Variant {
 impl Parse for Variant {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let attrs_in = input.call(Attribute::parse_outer)?;
-        let ty = input.parse::<syn::Type>()?;
-        let (ident, ty) = if input.peek(syn::token::Paren) {
+        let ty = input.parse::<Type>()?;
+        let (ident, ty) = if input.peek(Paren) {
             let content;
             let _paren_token = parenthesized!(content in input);
-            (ident_from_type(&ty)?, content.parse::<syn::Type>()?)
+            (ident_from_type(&ty)?, content.parse::<Type>()?)
         } else {
             (ident_from_type(&ty)?, ty)
         };
@@ -135,7 +137,7 @@ impl Parse for Variant {
         for a in attrs_in {
             if a.path().is_ident("into") {
                 into = a
-                    .parse_args_with(Punctuated::<syn::Type, Token![,]>::parse_terminated)?
+                    .parse_args_with(Punctuated::<Type, Token![,]>::parse_terminated)?
                     .iter()
                     .cloned()
                     .collect();
@@ -152,17 +154,17 @@ impl Parse for Variant {
     }
 }
 
-fn ident_from_type(ty: &syn::Type) -> syn::Result<Ident> {
+fn ident_from_type(ty: &Type) -> syn::Result<Ident> {
     match &ty {
-        syn::Type::Path(TypePath { path, .. }) => Ok(ident_from_path(path, "")),
-        syn::Type::Reference(TypeReference { elem, .. }) => {
+        Type::Path(TypePath { path, .. }) => Ok(ident_from_path(path, "")),
+        Type::Reference(TypeReference { elem, .. }) => {
             if let Some(path) = path_from_type(elem) {
                 Ok(ident_from_path(path, "Ref"))
             } else {
                 no_ident_err(ty)
             }
         }
-        syn::Type::Array(TypeArray { elem, len, .. }) => {
+        Type::Array(TypeArray { elem, len, .. }) => {
             let ext = format!("Array{}", syn_to_ident(len));
             if let Some(path) = path_from_type(elem) {
                 Ok(ident_from_path(path, &ext))
@@ -170,14 +172,14 @@ fn ident_from_type(ty: &syn::Type) -> syn::Result<Ident> {
                 no_ident_err(ty)
             }
         }
-        syn::Type::Slice(TypeSlice { elem, .. }) => {
+        Type::Slice(TypeSlice { elem, .. }) => {
             if let Some(path) = path_from_type(elem) {
                 Ok(ident_from_path(path, "Slice"))
             } else {
                 no_ident_err(ty)
             }
         }
-        syn::Type::Tuple(TypeTuple { elems, .. }) => {
+        Type::Tuple(TypeTuple { elems, .. }) => {
             let ident = elems
                 .iter()
                 .map(|t| path_from_type(t).map(|p| ident_from_path(p, "").to_string()))
@@ -197,7 +199,7 @@ fn ident_from_type(ty: &syn::Type) -> syn::Result<Ident> {
     }
 }
 
-fn no_ident_err(ty: &syn::Type) -> syn::Result<Ident> {
+fn no_ident_err(ty: &Type) -> syn::Result<Ident> {
     Err(syn::Error::new(
         ty.span(),
         "This type can't be used, try defining the variant name",
@@ -219,4 +221,50 @@ fn camel_to_snake(camel: &str) -> String {
         first = false;
     }
     snake
+}
+
+fn ident_from_path(p: &syn::Path, extension: &str) -> Ident {
+    let idents: Option<Vec<String>> = p
+        .segments
+        .iter()
+        .map(|p| {
+            let ident = p.ident.to_string();
+            let mut chars = ident.chars();
+            chars
+                .next()
+                .map(|first| format!("{}{}{extension}", first.to_uppercase(), chars.as_str()))
+        })
+        .collect();
+    idents
+        .map(|s| Ident::new(&s.concat(), p.span()))
+        .expect("Could not generate ident")
+}
+
+fn syn_to_ident<T: ToTokens>(t: T) -> String {
+    let input = t.to_token_stream().to_string();
+    input
+        .split_whitespace()
+        .map(|word| {
+            let filtered = word
+                .chars()
+                .filter(|c| c.is_alphanumeric())
+                .collect::<String>();
+            let mut chars = filtered.chars();
+            chars
+                .next()
+                .map(|first| format!("{}{}", first.to_uppercase(), chars.as_str()))
+                .expect("Could not uppercase first letter")
+        })
+        .collect::<Vec<String>>()
+        .concat()
+}
+
+fn path_from_type(ty: &Type) -> Option<&syn::Path> {
+    match ty {
+        Type::Path(TypePath { path, .. }) => Some(path),
+        Type::Reference(TypeReference { elem, .. })
+        | Type::Array(TypeArray { elem, .. })
+        | Type::Slice(TypeSlice { elem, .. }) => path_from_type(elem),
+        _ => None,
+    }
 }
