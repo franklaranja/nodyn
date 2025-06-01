@@ -41,6 +41,9 @@ syn = { version = "2.0.101", features = ["extra-traits", "full"] }
 [dev-dependencies]
 trybuild = { version = "1.0.105", features = ["diff"] }
 
+[lints.rust]
+unsafe_code = "forbid"
+
 [lints.clippy]
 pedantic =  "warn"
 
@@ -65,3 +68,4 @@ string_slice = "warn"
 string_to_string = "warn"
 unnecessary_self_imports = "warn"
 use_self = "warn"
+as_underscore = "warn"

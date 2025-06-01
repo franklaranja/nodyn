@@ -39,7 +39,7 @@
 //! - **Trait Objects**: Allow dynamic dispatch but incur runtime overhead and
 //!   type erasure.
 //! - **Enum Wrappers**: Provide type safety and zero-cost abstractions for a
-//!   fixed set of types known at compile time, as described in ["The Rust Programming Language"][book].
+//!   fixed set of types known at compile time, as described in [The Rust Programming Language][book].
 //!
 //! The `nodyn::nodyn!` macro simplifies the creation of enum wrappers by
 //! generating boilerplate code for variant creation, type conversions,
@@ -55,7 +55,7 @@
 //!
 //! ## Example with Trait Delegation
 //!
-//! Here's an example inspired by [Listing 10-13][listing-10-13] from ["The Rust Programming Language"][book], demonstrating trait delegation:
+//! Here's an example inspired by [Listing 10-13][listing-10-13] from [The Rust Programming Language][book], demonstrating trait delegation:
 //!
 //! ```rust
 //! pub trait Summary {
@@ -243,7 +243,7 @@
 //!
 //! ## Type Checking and Conversion Methods
 //!
-//! For each variant, the following methods are generated (using snake_case names):
+//! For each variant, the following methods are generated (using snake case names):
 //!
 //! ```rust
 //! nodyn::nodyn! {
@@ -291,7 +291,7 @@
 //! let text: Value = "hello".to_string().into(); // From<String>
 //! ```
 //!
-//! ## TryFrom Trait
+//! ## `TryFrom` Trait
 //!
 //! Automatic `TryFrom<Wrapper>` implementations for extracting original types:
 //!
@@ -390,6 +390,7 @@ pub(crate) use trait_block::TraitBlock;
 pub(crate) use variant::Variant;
 
 /// Creates a wrapper `enum` for a set of types with automatic method and trait delegation.
+#[allow(clippy::missing_panics_doc)]
 #[proc_macro]
 pub fn nodyn(input: TokenStream) -> TokenStream {
     let nodyn_enum = parse_macro_input!(input as NodynEnum);

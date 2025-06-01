@@ -19,5 +19,5 @@ fn main() {
         Foo::types(),
         ["i64", "&'a str", "u32", "[u8; 4]", "Vec<String>"]
     );
-    assert_eq!(t.type_name(), "&'a str")
+    assert_eq!(t.type_name(), "&'a str");
 }

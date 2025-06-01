@@ -122,6 +122,7 @@ fn main() {
 ## 📚 Documentation
 
 - [API Documentation](https://docs.rs/nodyn)
+- [Changelog](https://github.com/franklaranja/nodyn/blob/main/CHANGELOG.md)
 
 ## 🆚 Comparison
 
@@ -146,3 +147,10 @@ fn main() {
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+---
+
+<div align="center">
+
+**[Documentation](https://docs.rs/nodyn) | [Crates.io](https://crates.io/crates/nodyn) | [Repository](https://github.com/yourusername/nodyn)**
+
+</div>

@@ -42,15 +42,14 @@ impl Parse for NodynEnum {
         let _brace_token = syn::braced!(content in input);
         let variants = Punctuated::<Variant, Token![,]>::parse_terminated(&content)?;
         for variant in variants {
-            if !existing_types.contains(&variant.ty) {
-                existing_types.insert(variant.ty.clone());
-                wrapper.variants.push(variant)
-            } else {
+            if existing_types.contains(&variant.ty) {
                 return Err(syn::Error::new(
                     variant.ty.span(),
                     "Enum variant could not be generated, variant exists",
                 ));
             }
+            existing_types.insert(variant.ty.clone());
+            wrapper.variants.push(variant);
         }
         loop {
             if input.peek(Token![impl]) {
@@ -262,7 +261,7 @@ impl NodynEnum {
                 let is_a_arms = self
                     .variants
                     .iter()
-                    .map(|i| i.is_a_arm(&wrapper, &ty))
+                    .map(|i| i.is_a_arm(wrapper, ty))
                     .collect::<Vec<_>>();
                 let is_fn = Ident::new(&format!("is_{snake}"), ty.span());
                 let is_a_doc = &format!("Returns true if the variant is a {type_name}>");
@@ -270,7 +269,7 @@ impl NodynEnum {
                 let as_arms = self
                     .variants
                     .iter()
-                    .map(|i| i.as_arm(&wrapper, &ty))
+                    .map(|i| i.as_arm(wrapper, ty))
                     .collect::<Vec<_>>();
                 let as_fn = Ident::new(&format!("try_as_{snake}"), ty.span());
                 let as_doc = &format!("Returns the variant as an Option<{type_name}>");
@@ -281,7 +280,7 @@ impl NodynEnum {
                     let as_ref_arms = self
                         .variants
                         .iter()
-                        .map(|i| i.as_ref_arm(&wrapper, &ty))
+                        .map(|i| i.as_ref_arm(wrapper, ty))
                         .collect::<Vec<_>>();
                     let as_ref_fn = Ident::new(&format!("try_as_{snake}_ref"), ty.span());
                     let as_ref_doc = &format!("Returns the variant as an Option<&{type_name}>");
@@ -289,7 +288,7 @@ impl NodynEnum {
                     let as_mut_arms = self
                         .variants
                         .iter()
-                        .map(|i| i.as_mut_arm(&wrapper, &ty))
+                        .map(|i| i.as_mut_arm(wrapper, ty))
                         .collect::<Vec<_>>();
                     let as_mut_fn = Ident::new(&format!("try_as_{snake}_mut"), ty.span());
                     let as_mut_doc = &format!("Returns the variant as an Option<&mut {type_name}>");
