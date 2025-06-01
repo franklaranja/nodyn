@@ -1,6 +1,6 @@
 use core::convert::TryFrom;
 
-nodyn::wrap! {
+nodyn::nodyn! {
     #[derive(PartialEq, Debug)]
     pub enum Foo<'a> {
         i64,

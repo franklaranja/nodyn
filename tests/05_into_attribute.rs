@@ -1,7 +1,7 @@
 use core::convert::TryFrom;
 
-nodyn::wrap! {
-  /// A test of the `wrap!` macro
+nodyn::nodyn! {
+  /// A test of the `nodyn!` macro
   #[derive(PartialEq, Debug, Clone)]
   pub enum Foo<'a> {
     i64,

@@ -1,4 +1,4 @@
-nodyn::wrap! {
+nodyn::nodyn! {
   #[derive(PartialEq, Debug)]
   pub enum Foo<'a> {
     i64,

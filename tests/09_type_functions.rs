@@ -1,7 +1,7 @@
 // this file is for dev only, changes all the time
 
-nodyn::wrap! {
-  /// A test of the `wrap!` macro
+nodyn::nodyn! {
+  /// A test of the `nodyn!` macro
   #[derive(Debug, PartialEq)]
   pub enum Foo<'a> {
     i64,

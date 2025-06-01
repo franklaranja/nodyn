@@ -164,25 +164,25 @@ impl Parse for Variant {
 
 fn ident_from_type(ty: &Type) -> syn::Result<Ident> {
     match &ty {
-        Type::Path(TypePath { path, .. }) => Ok(ident_from_path(path, "")),
+        Type::Path(TypePath { path, .. }) => Ok(camel_case_ident(path, "")),
         Type::Reference(TypeReference { elem, .. }) => {
-            if let Some(path) = path_from_type(elem) {
-                Ok(ident_from_path(path, "Ref"))
+            if let Some(path) = extract_path(elem) {
+                Ok(camel_case_ident(path, "Ref"))
             } else {
                 no_ident_err(ty)
             }
         }
         Type::Array(TypeArray { elem, len, .. }) => {
-            let ext = format!("Array{}", syn_to_ident(len));
-            if let Some(path) = path_from_type(elem) {
-                Ok(ident_from_path(path, &ext))
+            let ext = format!("Array{}", camel_case_tokens(len));
+            if let Some(path) = extract_path(elem) {
+                Ok(camel_case_ident(path, &ext))
             } else {
                 no_ident_err(ty)
             }
         }
         Type::Slice(TypeSlice { elem, .. }) => {
-            if let Some(path) = path_from_type(elem) {
-                Ok(ident_from_path(path, "Slice"))
+            if let Some(path) = extract_path(elem) {
+                Ok(camel_case_ident(path, "Slice"))
             } else {
                 no_ident_err(ty)
             }
@@ -190,7 +190,7 @@ fn ident_from_type(ty: &Type) -> syn::Result<Ident> {
         Type::Tuple(TypeTuple { elems, .. }) => {
             let ident = elems
                 .iter()
-                .map(|t| path_from_type(t).map(|p| ident_from_path(p, "").to_string()))
+                .map(|t| extract_path(t).map(|p| camel_case_ident(p, "").to_string()))
                 .collect::<Option<Vec<String>>>()
                 .map(|mut v| {
                     v.push("Tuple".to_string());
@@ -231,7 +231,17 @@ fn camel_to_snake(camel: &str) -> String {
     snake
 }
 
-fn ident_from_path(p: &syn::Path, extension: &str) -> Ident {
+/// Generates a CamelCase identifier from a type path with an optional extension.
+///
+/// # Arguments
+///
+/// - `p`: The `syn::Path` to convert (e.g., `std::string::String`).
+/// - `extension`: A string to append to the generated identifier (e.g., `Ref` for references).
+///
+/// # Returns
+///
+/// A `syn::Ident` representing the CamelCase name (e.g., `String` for `std::string::String`).
+fn camel_case_ident(p: &syn::Path, extension: &str) -> Ident {
     let idents: Option<Vec<String>> = p
         .segments
         .iter()
@@ -272,7 +282,16 @@ fn ident_from_path(p: &syn::Path, extension: &str) -> Ident {
         .expect("Could not generate ident")
 }
 
-fn syn_to_ident<T: ToTokens>(t: T) -> String {
+/// Converts tokens to a CamelCase string representation.
+///
+/// # Arguments
+///
+/// - `t`: something that implements `ToTokens`.
+///
+/// # Returns
+///
+/// A `String` in CamelCase (e.g., `I32` for `i32`).
+fn camel_case_tokens<T: ToTokens>(t: T) -> String {
     let input = t.to_token_stream().to_string();
     input
         .split_whitespace()
@@ -291,12 +310,21 @@ fn syn_to_ident<T: ToTokens>(t: T) -> String {
         .concat()
 }
 
-fn path_from_type(ty: &Type) -> Option<&syn::Path> {
+/// Extracts a `syn::Path` from a `syn::Type`, if applicable.
+///
+/// # Arguments
+///
+/// - `ty`: The type to analyze (e.g., `syn::Type::Path`, `syn::Type::Reference`).
+///
+/// # Returns
+///
+/// An `Option<&syn::Path>` containing the path if the type is a path, reference, array, or slice.
+fn extract_path(ty: &Type) -> Option<&syn::Path> {
     match ty {
         Type::Path(TypePath { path, .. }) => Some(path),
         Type::Reference(TypeReference { elem, .. })
         | Type::Array(TypeArray { elem, .. })
-        | Type::Slice(TypeSlice { elem, .. }) => path_from_type(elem),
+        | Type::Slice(TypeSlice { elem, .. }) => extract_path(elem),
         _ => None,
     }
 }
