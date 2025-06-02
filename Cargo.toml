@@ -1,11 +1,12 @@
 [package]
 name = "nodyn"
-description = "A macro for creating wrapper enums with automatic trait and method delegation. "
+description = "Easy polymorphism with enums"
 version = "0.1.0"
 authors = ["Frank Laranja <laranja@riseup.net>"]
 repository = "https://github.com/franklaranja/nodyn"
 keywords = [
     "enum",
+    "polymorphism",
     "variant",
     "delegation",
     "performance",

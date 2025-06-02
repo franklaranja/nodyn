@@ -1,3 +1,5 @@
+//! Easy polymorphism with enums.
+//!
 //! The `nodyn!` macro generates a Rust `enum` that wraps a fixed set
 //! of types, providing automatic implementations for `From`, `TryFrom`,
 //! and delegated methods or traits. This is useful when you need to store

@@ -1,5 +1,7 @@
 # Nodyn
 
+Easy polymorphism with enums.
+
 [![Crates.io](https://img.shields.io/crates/v/nodyn.svg)](https://crates.io/crates/nodyn)
 [![Docs.rs](https://docs.rs/nodyn/badge.svg)](https://docs.rs/nodyn)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
