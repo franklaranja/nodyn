@@ -206,7 +206,6 @@ All features are enabled by default.
 | `try_into`      | automatic TryFrom trait implementation |
 | `introspection` | generation of type introspection functions |
 | `is_as`         | generation of variant test and accessor functions |
-```
 
 ## 📚 Documentation
 
