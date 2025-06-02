@@ -7,14 +7,8 @@ repository = "https://github.com/franklaranja/nodyn"
 keywords = [
     "enum",
     "polymorphism",
-    "variant",
     "delegation",
-    "performance",
-    "type",
     "traits",
-    "dynamic",
-    "optimization",
-    "macros",
     "proc-macros",
 ]
 categories = [
