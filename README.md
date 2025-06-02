@@ -17,10 +17,10 @@ objects.
 
 ## Features
 
+- **Method and Trait Delegation**: Delegates methods or entire traits to the underlying types.
 - **Automatic Variant Creation**: Generates an enum with variants for specified types (e.g., `i32`, `String`, custom structs).
 - **Type Conversion**: Implements `From<T>` for each variant type and `TryFrom<Enum> for T` for non-reference types.
-- **Method and Trait Delegation**: Delegates methods or entire traits to the underlying types.
-- **Type Introspection**: Provides utility methods like `count()`, `types()`, and `ty()` to query variant information.
+- **Type Introspection**: Provides utility methods like `count()`, `types()`, and `type_name()` to query variant information.
 - **Custom Variant Names**: Allows overriding default variant names for clarity.
 - **Supported Types**: Handles path types, references, arrays and tuples.
 
@@ -66,58 +66,129 @@ fn main() {
 }
 ```
 
- ## Method Delegation Example
+## Method Delegation Example
 
- ```rust
- nodyn::nodyn! {
-     enum Container { String, Vec<u8> }
+```rust
+nodyn::nodyn! {
+    enum Container { String, Vec<u8> }
 
-     impl {
-         // Delegate methods that exist on all types
-         fn len(&self) -> usize;
-         fn is_empty(&self) -> bool;
-         fn clear(&mut self);
-         
-         // Add custom methods
-         fn type_name(&self) -> &'static str {
-             match self {
-                 Self::String(_) => "String",
-                 Self::VecU8(_) => "Vec<u8>",
-             }
-         }
-     }
- }
+    impl {
+        // Delegate methods that exist on all types
+        fn len(&self) -> usize;
+        fn is_empty(&self) -> bool;
+        fn clear(&mut self);
+    }
+}
 
- let mut container: Container = "hello".to_string().into();
- assert_eq!(container.len(), 5);
- assert!(!container.is_empty());
- assert_eq!(container.type_name(), "String");
- ```
+let mut container: Container = "hello".to_string().into();
+assert_eq!(container.len(), 5);
+assert!(!container.is_empty());
+```
 
 ## Trait Implementation Example
 
- ```rust
- use std::fmt::{self, Display};
+```rust
+use std::fmt::{self, Display};
 
- // All wrapped types implement Display
- nodyn::nodyn! {
-     enum Displayable { i32, String, f64 }
+// All wrapped types implement Display
+nodyn::nodyn! {
+    enum Displayable { i32, String, f64 }
 
-     impl Display {
-         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
-     }
- }
+    impl Display {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
+    }
+}
 
- let values: Vec<Displayable> = vec![
-     42.into(),
-     "hello".to_string().into(),
-     3.14.into(),
- ];
+let values: Vec<Displayable> = vec![
+    42.into(),
+    "hello".to_string().into(),
+    3.14.into(),
+];
 
- for val in values {
-     println!("{}", val); // Uses delegated Display implementation
- }
- ```
+for val in values {
+    println!("{}", val); // Uses delegated Display implementation
+}
+```
+
+## Advanced Example
+
+```rust
+use std::fmt;
+
+#[derive(Debug, Clone)]
+pub struct Null;
+//!
+impl fmt::Display for Null {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "null")
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct JsonArray(Vec<JsonValue>);
+
+impl fmt::Display for JsonArray {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = self
+            .0
+            .iter()
+            .map(|v| v.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        write!(f, "[{s}]")
+    }
+}
+
+nodyn::nodyn! {
+    #[derive(Debug, Clone)]
+    pub enum JsonValue {
+        Null,
+        bool,
+        f64,
+        String,
+        JsonArray,
+    }
+
+    impl fmt::Display {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
+    }
+
+    impl {
+        fn json_type_name(&self) -> &'static str {
+            match self {
+                Self::Null(_) => "null",
+                Self::Bool(_) => "boolean",
+                Self::F64(_) => "number",
+                Self::String(_) => "string",
+                Self::JsonArray(_) => "array",
+            }
+        }
+    }
+}
+
+let values: Vec<JsonValue> = vec![
+    Null.into(),                // null
+    true.into(),                // boolean
+    42.0.into(),                // number
+    "hello".to_string().into(), // string
+    JsonArray(vec![
+        Null.into(),
+        false.into(),
+        33.0.into(),
+        "world".to_string().into(),
+    ]) .into(),
+];
+
+for val in &values {
+    println!("{}: {}", val.json_type_name(), val);
+}
+
+// null: null
+// boolean: true
+// number: 42
+// string: hello
+// array: [null, false, 33, world]
+```
 
 ## 📚 Documentation
 
@@ -129,7 +200,7 @@ fn main() {
 | Feature | nodyn | enum_dispatch | sum_type | Box\<dyn Trait\> |
 |---------|-------|---------------|----------|----------------|
 | **Runtime cost** | Zero | Zero | Zero | Heap allocation |
-| **Trait delegation** | ✅ Full | ✅ Scoped only | ❌ No | ✅ Yes |
+| **Trait delegation** | ✅ Yes | ✅ Scoped only | ❌ No | ✅ Yes |
 | **Method delegation** | ✅ Yes | ❌ No | ❌ No | ✅ Yes |
 | **Type introspection** | ✅ Built-in | ❌ No | ❌ No | ❌ No |
 | **Compile-time known** | Required | Required | Required | Not required |
