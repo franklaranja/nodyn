@@ -5,10 +5,10 @@ use quote::quote;
 use std::collections::HashSet;
 use syn::Type;
 use syn::{
+    Attribute, FnArg, Generics, Ident, Token, Visibility,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     spanned::Spanned,
-    Attribute, FnArg, Generics, Ident, Token, Visibility,
 };
 
 #[derive(Debug, Clone)]

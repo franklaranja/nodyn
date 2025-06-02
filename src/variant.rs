@@ -1,13 +1,12 @@
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use syn::{
-    parenthesized,
+    Attribute, FnArg, GenericArgument, Ident, PathArguments, Token, Type, TypeArray, TypePath,
+    TypeReference, TypeTuple, parenthesized,
     parse::Parse,
     punctuated::Punctuated,
     spanned::Spanned,
     token::{Comma, Paren},
-    Attribute, FnArg, GenericArgument, Ident, PathArguments, Token, Type, TypeArray, TypePath,
-    TypeReference, TypeTuple,
 };
 
 #[derive(Debug, Clone)]

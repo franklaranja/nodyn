@@ -24,6 +24,7 @@ readme = "README.md"
 license = "MIT"
 edition = "2024"
 autotests = false
+exclude = [".*"]
 
 [lib]
 path = "src/lib.rs"
