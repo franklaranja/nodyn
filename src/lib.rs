@@ -1,4 +1,4 @@
-//! Easy polymorphism with enums.
+//! *Easy polymorphism with enums*
 //!
 //! The `nodyn!` macro generates a Rust `enum` that wraps a fixed set
 //! of types, providing automatic implementations for `From`, `TryFrom`,
@@ -469,12 +469,12 @@
 //!
 //! All features are enabled by default.
 //!
-//! |feature|enables|
+//! | feature | enables |
 //! |-------|-------|
-//! |`from`          | automatic From trait implementation |
-//! |`try_into`      | automatic TryFrom trait implementation |
-//! |`introspection` | generation of type introspection functions |
-//! |`is_as`         | generation of variant test and accessor functions |
+//! | `from`          | automatic From trait implementation |
+//! | `try_into`      | automatic TryFrom trait implementation |
+//! | `introspection` | generation of type introspection functions |
+//! | `is_as`         | generation of variant test and accessor functions |
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse_macro_input;

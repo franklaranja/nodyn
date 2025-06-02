@@ -1,10 +1,14 @@
 # Nodyn
 
-Easy polymorphism with enums.
-
 [![Crates.io](https://img.shields.io/crates/v/nodyn.svg)](https://crates.io/crates/nodyn)
 [![Docs.rs](https://docs.rs/nodyn/badge.svg)](https://docs.rs/nodyn)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+<div align="center">
+
+*Easy polymorphism with enums*
+
+</div>
 
 `nodyn` provides a Rust macro for creating wrapper enums that
 encapsulate a fixed set of types with automatic implementations
@@ -195,12 +199,12 @@ for val in &values {
 
 All features are enabled by default.
 
-|feature|enables|
+| Feature | enables |
 |-------|-------|
-|`from`          | automatic From trait implementation |
-|`try_into`      | automatic TryFrom trait implementation |
-|`introspection` | generation of type introspection functions |
-|`is_as`         | generation of variant test and accessor functions |
+| `from`          | automatic From trait implementation |
+| `try_into`      | automatic TryFrom trait implementation |
+| `introspection` | generation of type introspection functions |
+| `is_as`         | generation of variant test and accessor functions |
 ```
 
 ## 📚 Documentation
