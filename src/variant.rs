@@ -7,7 +7,7 @@ use syn::{
     spanned::Spanned,
     token::{Comma, Paren},
     Attribute, FnArg, GenericArgument, Ident, PathArguments, Token, Type, TypeArray, TypePath,
-    TypeReference, TypeSlice, TypeTuple,
+    TypeReference, TypeTuple,
 };
 
 #[derive(Debug, Clone)]
@@ -180,13 +180,6 @@ fn ident_from_type(ty: &Type) -> syn::Result<Ident> {
                 no_ident_err(ty)
             }
         }
-        Type::Slice(TypeSlice { elem, .. }) => {
-            if let Some(path) = extract_path(elem) {
-                Ok(camel_case_ident(path, "Slice"))
-            } else {
-                no_ident_err(ty)
-            }
-        }
         Type::Tuple(TypeTuple { elems, .. }) => {
             let ident = elems
                 .iter()
@@ -322,9 +315,9 @@ fn camel_case_tokens<T: ToTokens>(t: T) -> String {
 fn extract_path(ty: &Type) -> Option<&syn::Path> {
     match ty {
         Type::Path(TypePath { path, .. }) => Some(path),
-        Type::Reference(TypeReference { elem, .. })
-        | Type::Array(TypeArray { elem, .. })
-        | Type::Slice(TypeSlice { elem, .. }) => extract_path(elem),
+        Type::Reference(TypeReference { elem, .. }) | Type::Array(TypeArray { elem, .. }) => {
+            extract_path(elem)
+        }
         _ => None,
     }
 }

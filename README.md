@@ -22,7 +22,7 @@ objects.
 - **Method and Trait Delegation**: Delegates methods or entire traits to the underlying types.
 - **Type Introspection**: Provides utility methods like `count()`, `types()`, and `ty()` to query variant information.
 - **Custom Variant Names**: Allows overriding default variant names for clarity.
-- **Supported Types**: Handles path types, references, arrays, slices, and tuples.
+- **Supported Types**: Handles path types, references, arrays and tuples.
 
 ## Installation
 

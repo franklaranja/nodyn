@@ -191,12 +191,11 @@ impl NodynEnum {
         self.trait_blocks
             .iter()
             .map(|b| {
-                let trait_name = &b.ident;
-                let trait_gen = &b.generics;
+                let trait_path = &b.path;
                 let items = &b.block.items;
                 let fns = b.block.expand_methods(self);
                 quote! {
-                    impl #lt #trait_name #trait_gen for #wrapper #lt {
+                    impl #lt #trait_path for #wrapper #lt {
                          #(#items)*
                          #(#fns)*
                     }

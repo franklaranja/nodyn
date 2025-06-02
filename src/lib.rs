@@ -124,7 +124,6 @@
 //! | **Path types** | `String`, `i32`, `Vec<T>` | `String`, `I32`, `VecT` | CamelCase conversion |
 //! | **References** | `&str` | `StrRef` | Adds `Ref` suffix |
 //! | **Arrays** | `[i32; 4]` | `I32Array4` | Adds `Array{len}` suffix |
-//! | **Slices** | `&[u8]` | `U8Slice` | Adds `Slice` suffix |
 //! | **Tuples** | `(i32, String)` | `I32String` | Concatenates types |
 //!
 //! ### Complex Types Example
@@ -188,7 +187,6 @@
 //! - **Path types**: `i32`, `String`, `Vec<T>`, `Option<T>`, etc.
 //! - **Reference types**: `&T`, `&mut T`, `&'a str`
 //! - **Array types**: `[T; N]`
-//! - **Slice types**: `&[T]`
 //! - **Tuple types**: `(T1, T2, ...)`
 //!
 //! ## Automatic Variant Naming
@@ -196,13 +194,12 @@
 //! ```rust
 //! nodyn::nodyn! {
 //!     #[derive(Debug)]
-//!     pub enum Example<'a, 'b> {
+//!     pub enum Example<'a> {
 //!         i32,           // → I32(i32)
 //!         String,        // → String(String)
 //!         (u8, u16),     // → U8U16((u8, u16))
 //!         [bool; 2],     // → BoolArray2([bool; 2])
 //!         &'a str,       // → StrRef(&'a str)
-//!         &'b [u8],         // → U8Slice(&[u8])
 //!     }
 //! }
 //! ```
