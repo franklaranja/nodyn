@@ -48,9 +48,11 @@
 //! ## Key Features
 //!
 //! - **Automatic Variant Creation**: Generates an enum with variants for each specified type.
-//! - **Type Conversion**: Implements `From<T>` for each variant type and `TryFrom<Enum> for T` for non-reference types.
+//! - **Type Conversion**: Implements `From<T>` for each variant type and `TryFrom<Enum> for T`
+//!   for non-reference types. (Available with the `from` and `try_into` features)
 //! - **Method and Trait Delegation**: Delegates methods or entire traits to the underlying types.
-//! - **Type Introspection**: Provides utility methods like `count()`, `types()`, and `ty()` to query variant information.
+//! - **Type Introspection**: Provides utility methods like `count()`, `types()`, and `ty()` to
+//!   query variant information. (available the `introspection` feature)
 //! - **Custom Variant Names**: Allows overriding default variant names for clarity.
 //!
 //! ## Example with Trait Delegation
@@ -222,6 +224,8 @@
 //!
 //! ## Type Information Methods
 //!
+//! Available with the `introspection` feature.
+//!
 //! ```rust
 //! nodyn::nodyn! {
 //!     enum Value { i32, String, f64 }
@@ -239,6 +243,8 @@
 //! ```
 //!
 //! ## Type Checking and Conversion Methods
+//!
+//! Available with the `is_as` feature.
 //!
 //! For each variant, the following methods are generated (using snake case names):
 //!
@@ -279,6 +285,8 @@
 //!
 //! Automatic `From<T>` implementations for all variant types:
 //!
+//! Available with the `from` feature.
+//!
 //! ```rust
 //! nodyn::nodyn! {
 //!     enum Value { i32, String }
@@ -291,6 +299,8 @@
 //! ## `TryFrom` Trait
 //!
 //! Automatic `TryFrom<Wrapper>` implementations for extracting original types:
+//!
+//! Available with the `try_into` feature.
 //!
 //! ```rust
 //! use std::convert::TryFrom;
@@ -395,7 +405,7 @@
 //!         let s = self
 //!             .0
 //!             .iter()
-//!             .map(|v| v.to_string())
+//!             .map(ToString::to_string)
 //!             .collect::<Vec<_>>()
 //!             .join(", ");
 //!         write!(f, "[{s}]")
@@ -417,7 +427,7 @@
 //!     }
 //!
 //!     impl {
-//!         fn json_type_name(&self) -> &'static str {
+//!         pub const fn json_type_name(&self) -> &'static str {
 //!             match self {
 //!                 Self::Null(_) => "null",
 //!                 Self::Bool(_) => "boolean",
@@ -452,6 +462,17 @@
 //! // string: hello
 //! // array: [null, false, 33, world]
 //! ```
+//!
+//! # Features
+//!
+//! All features are enabled by default.
+//!
+//! |feature|enables|
+//! |-------|-------|
+//! |`from`          | automatic From trait implementation |
+//! |`try_into`      | automatic TryFrom trait implementation |
+//! |`introspection` | generation of type introspection functions |
+//! |`is_as`         | generation of variant test and accessor functions |
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse_macro_input;
@@ -473,12 +494,24 @@ pub fn nodyn(input: TokenStream) -> TokenStream {
     let nodyn_enum = parse_macro_input!(input as NodynEnum);
 
     let e_num = nodyn_enum.generate_enum();
+    #[cfg(feature = "from")]
     let from = nodyn_enum.generate_from();
+    #[cfg(not(feature = "from"))]
+    let from = Vec::<&str>::new();
+    #[cfg(feature = "try_into")]
     let try_into = nodyn_enum.generate_try_from();
+    #[cfg(not(feature = "try_into"))]
+    let try_into = Vec::<&str>::new();
     let impl_blocks = nodyn_enum.generate_impl_blocks();
     let trait_blocks = nodyn_enum.generate_trait_blocks();
+    #[cfg(feature = "introspection")]
     let type_fns = nodyn_enum.generate_type_to_str();
+    #[cfg(not(feature = "introspection"))]
+    let type_fns = "";
+    #[cfg(feature = "is_as")]
     let is_as_fn = nodyn_enum.generate_is_as().unwrap();
+    #[cfg(not(feature = "is_as"))]
+    let is_as_fn = "";
 
     let expanded = quote! {
         #e_num

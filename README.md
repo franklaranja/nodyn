@@ -132,7 +132,7 @@ impl fmt::Display for JsonArray {
         let s = self
             .0
             .iter()
-            .map(|v| v.to_string())
+            .map(ToString::to_string)
             .collect::<Vec<_>>()
             .join(", ");
         write!(f, "[{s}]")
@@ -154,7 +154,7 @@ nodyn::nodyn! {
     }
 
     impl {
-        fn json_type_name(&self) -> &'static str {
+        pub const fn json_type_name(&self) -> &'static str {
             match self {
                 Self::Null(_) => "null",
                 Self::Bool(_) => "boolean",
@@ -188,6 +188,17 @@ for val in &values {
 // number: 42
 // string: hello
 // array: [null, false, 33, world]
+
+## Features
+
+All features are enabled by default.
+
+|feature|enables|
+|-------|-------|
+|`from`          | automatic From trait implementation |
+|`try_into`      | automatic TryFrom trait implementation |
+|`introspection` | generation of type introspection functions |
+|`is_as`         | generation of variant test and accessor functions |
 ```
 
 ## 📚 Documentation

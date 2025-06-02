@@ -17,7 +17,7 @@ impl fmt::Display for JsonArray {
         let s = self
             .0
             .iter()
-            .map(|v| v.to_string())
+            .map(ToString::to_string)
             .collect::<Vec<_>>()
             .join(", ");
         write!(f, "[{s}]")
@@ -40,7 +40,7 @@ nodyn::nodyn! {
 
     impl {
         // Custom method
-        fn json_type_name(&self) -> &'static str {
+        const fn json_type_name(&self) -> &'static str {
             match self {
                 Self::Null(_) => "null",
                 Self::Bool(_) => "boolean",
