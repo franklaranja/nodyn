@@ -42,9 +42,7 @@ nodyn = "0.1.0"
 ## Basic example
 
 ```rust
-use nodyn::wrap;
-
-wrap! {
+nodyn::nodyn! {
     #[derive(Debug, PartialEq)]
     pub enum Value {
         i32,
@@ -218,7 +216,7 @@ All features are enabled by default.
 |---------|-------|---------------|----------|----------------|
 | **Runtime cost** | Zero | Zero | Zero | Heap allocation |
 | **Trait delegation** | ✅ Yes | ✅ Scoped only | ❌ No | ✅ Yes |
-| **Method delegation** | ✅ Yes | ❌ No | ❌ No | ✅ Yes |
+| **Method delegation** | ✅ Yes | ❌ No | ❌ No | ❌ No |
 | **Type introspection** | ✅ Built-in | ❌ No | ❌ No | ❌ No |
 | **Compile-time known** | Required | Required | Required | Not required |
 | **Memory overhead** | Discriminant only | Discriminant only | Discriminant only | Pointer + vtable |
