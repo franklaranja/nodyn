@@ -1,15 +1,19 @@
-use crate::Variant;
+use crate::{keyword, Features, Variant};
 use crate::{ImplBlock, TraitBlock};
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::HashSet;
 use syn::Type;
 use syn::{
-    Attribute, FnArg, Generics, Ident, Token, Visibility,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     spanned::Spanned,
+    Attribute, FnArg, Generics, Ident, Token, Visibility,
 };
+mod kw {
+    syn::custom_keyword!(from);
+    syn::custom_keyword!(str);
+}
 
 #[derive(Debug, Clone)]
 pub(crate) struct NodynEnum {
@@ -22,6 +26,7 @@ pub(crate) struct NodynEnum {
     pub(crate) variants: Vec<Variant>,
     pub(crate) impl_blocks: Vec<ImplBlock>,
     pub(crate) trait_blocks: Vec<TraitBlock>,
+    pub(crate) features: Features,
 }
 
 impl Parse for NodynEnum {
@@ -35,6 +40,7 @@ impl Parse for NodynEnum {
             variants: Vec::new(),
             impl_blocks: Vec::new(),
             trait_blocks: Vec::new(),
+            features: Features::default(),
         };
 
         let mut existing_types = HashSet::new();
@@ -54,8 +60,16 @@ impl Parse for NodynEnum {
         loop {
             if input.peek(Token![impl]) {
                 let _keyword = input.parse::<syn::token::Impl>()?;
-                // impl of a trait if followed by an identi
-                if input.peek(Ident) {
+                // features
+                if input.peek(keyword::From)
+                    || input.peek(keyword::TryInto)
+                    || input.peek(keyword::is_as)
+                    || input.peek(keyword::introspection)
+                {
+                    wrapper.features.merge(input.parse::<Features>()?);
+
+                    // impl of a trait if followed by an identi
+                } else if input.peek(Ident) {
                     wrapper.trait_blocks.push(input.parse::<TraitBlock>()?);
                 } else {
                     wrapper.impl_blocks.push(input.parse::<ImplBlock>()?);
@@ -202,6 +216,67 @@ impl NodynEnum {
                 }
             })
             .collect()
+    }
+
+    pub(crate) fn generate_features(&self) -> TokenStream {
+        if self.features.none() {
+            // depreciated feature flags only if no features are set
+
+            #[cfg(feature = "from")]
+            let from = self.generate_from();
+            #[cfg(not(feature = "from"))]
+            let from = Vec::<&str>::new();
+
+            #[cfg(feature = "try_into")]
+            let try_into = self.generate_try_from();
+            #[cfg(not(feature = "try_into"))]
+            let try_into = Vec::<&str>::new();
+
+            #[cfg(feature = "introspection")]
+            let type_fns = self.generate_type_to_str();
+            #[cfg(not(feature = "introspection"))]
+            let type_fns = "";
+
+            #[cfg(feature = "is_as")]
+            let is_as_fn = self.generate_is_as().unwrap();
+            #[cfg(not(feature = "is_as"))]
+            let is_as_fn = "";
+
+            quote! {
+                #(#from)*
+                #(#try_into)*
+                #type_fns
+                #is_as_fn
+            }
+        } else {
+            let from = if self.features.from {
+                self.generate_from()
+            } else {
+                Vec::new()
+            };
+
+            let try_into = if self.features.try_into {
+                self.generate_try_from()
+            } else {
+                Vec::new()
+            };
+            let type_fns = if self.features.introspection {
+                self.generate_type_to_str()
+            } else {
+                proc_macro2::TokenStream::new()
+            };
+            let is_as_fn = if self.features.is_as {
+                self.generate_is_as().unwrap()
+            } else {
+                proc_macro2::TokenStream::new()
+            };
+            quote! {
+                #(#from)*
+                #(#try_into)*
+                #type_fns
+                #is_as_fn
+            }
+        }
     }
 
     pub(crate) fn generate_type_to_str(&self) -> TokenStream {

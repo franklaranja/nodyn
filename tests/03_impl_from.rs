@@ -7,6 +7,8 @@ nodyn::nodyn! {
     [u8;4],
   }
 
+  impl From
+
 }
 
 fn main() {

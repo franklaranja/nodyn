@@ -16,6 +16,8 @@
 //!         String,
 //!         f64,
 //!     }
+//!
+//!     impl From;
 //! }
 //!
 //! let values: Vec<Value> = vec![
@@ -143,6 +145,8 @@
 //!         &'a str,                // StrRef
 //!         Vec<String>,            // VecString
 //!     }
+//!
+//!     impl From;
 //! }
 //!
 //! let values = vec![
@@ -167,6 +171,8 @@
 //!         [Type,]
 //!     }
 //!
+//!     [impl From | TryInto | is_as | introspection]
+//!
 //!     [impl TraitName {
 //!         fn method_name(&self, args) -> ReturnType;
 //!     }]
@@ -179,6 +185,7 @@
 //!
 //! - **Enum Definition**: Define the enum with optional visibility, derive attributes, and lifetimes.
 //! - **Variants**: Specify types directly (e.g., `i32`, `String`) or with custom variant names (e.g., `Int(i32)`).
+//! - **Features**: Specify included festures
 //! - **Trait Delegation**: Include trait `impl` blocks to delegate trait methods to wrapped types.
 //! - **Method Delegation**: Include regular `impl` blocks to delegate custom methods.
 //!
@@ -231,6 +238,8 @@
 //! ```rust
 //! nodyn::nodyn! {
 //!     enum Value { i32, String, f64 }
+//!
+//!     impl introspection From;
 //! }
 //!
 //! // Number of variants
@@ -253,6 +262,8 @@
 //! ```rust
 //! nodyn::nodyn! {
 //!     enum Container { String, Vec<u8> }
+//!
+//!     impl as_is From;
 //! }
 //!
 //! let container: Container = "hello".to_string().into();
@@ -287,11 +298,13 @@
 //!
 //! Automatic `From<T>` implementations for all variant types:
 //!
-//! Available with the `from` feature.
+//! Available with the `From` feature.
 //!
 //! ```rust
 //! nodyn::nodyn! {
 //!     enum Value { i32, String }
+//!
+//!     impl From;
 //! }
 //!
 //! let num: Value = 42.into();          // From<i32>
@@ -302,13 +315,15 @@
 //!
 //! Automatic `TryFrom<Wrapper>` implementations for extracting original types:
 //!
-//! Available with the `try_into` feature.
+//! Available with the `TryInto` feature.
 //!
 //! ```rust
 //! use std::convert::TryFrom;
 //!
 //! nodyn::nodyn! {
 //!     enum Value { i32, String }
+//!
+//!     impl From TryInto;
 //! }
 //!
 //! let val: Value = 42.into();
@@ -330,6 +345,8 @@
 //!           #[into(i64)]
 //!           i32,
 //!       }
+//!
+//!       impl From TryInto;
 //!   }
 //!   let foo: Foo = 42.into();
 //!   assert_eq!(i64::try_from(foo), Ok(42i64));
@@ -343,6 +360,8 @@
 //! ```rust
 //! nodyn::nodyn! {
 //!     enum Container { String, Vec<u8> }
+//!
+//!     impl From;
 //!
 //!     impl {
 //!         // Delegate methods that exist on all types
@@ -368,6 +387,8 @@
 //! // All wrapped types implement Display
 //! nodyn::nodyn! {
 //!     enum Displayable { i32, String, f64 }
+//!
+//!     impl From;
 //!
 //!     impl Display {
 //!         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
@@ -424,6 +445,8 @@
 //!         JsonArray,
 //!     }
 //!
+//!     impl From;
+//!
 //!     impl fmt::Display {
 //!         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
 //!     }
@@ -467,23 +490,35 @@
 //!
 //! # Features
 //!
-//! All features are enabled by default.
+//! These used to be generated using a cargo feature flags, this
+//! way is depreciated. Change to enabling features using `impl`
+//! in the macro.
 //!
-//! | feature | enables |
-//! |-------|-------|
-//! | `from`          | automatic From trait implementation |
-//! | `try_into`      | automatic TryFrom trait implementation |
-//! | `introspection` | generation of type introspection functions |
-//! | `is_as`         | generation of variant test and accessor functions |
+//! All cargo features are enabled by default, but features using
+//! impl are all disabled by default so you have to start adding
+//! the features you want. As a transition if you don't specify
+//! any features using impl, cargo feature flags will be used.
+//!
+//! The names of `from` and `try_into` features have changed for
+//! `impl`: use CamelCase.
+//!
+//! | cargo (depreciated) | impl | enables |
+//! |-------|-------|----------|
+//! | `from`          | `From` | automatic From trait implementation |
+//! | `try_into`      | `TryInto` | automatic TryFrom trait implementation |
+//! | `introspection` | `introspection` | generation of type introspection functions |
+//! | `is_as`         | `is_ad` | generation of variant test and accessor functions |
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse_macro_input;
 
+mod feature;
 mod impl_block;
 mod nodyn_enum;
 mod trait_block;
 mod variant;
 
+pub(crate) use feature::{keyword, Features};
 pub(crate) use impl_block::ImplBlock;
 pub(crate) use nodyn_enum::NodynEnum;
 pub(crate) use trait_block::TraitBlock;
@@ -496,33 +531,59 @@ pub fn nodyn(input: TokenStream) -> TokenStream {
     let nodyn_enum = parse_macro_input!(input as NodynEnum);
 
     let e_num = nodyn_enum.generate_enum();
-    #[cfg(feature = "from")]
-    let from = nodyn_enum.generate_from();
-    #[cfg(not(feature = "from"))]
-    let from = Vec::<&str>::new();
-    #[cfg(feature = "try_into")]
-    let try_into = nodyn_enum.generate_try_from();
-    #[cfg(not(feature = "try_into"))]
-    let try_into = Vec::<&str>::new();
+    // let mut from = if nodyn_enum.features.from {
+    //     nodyn_enum.generate_from()
+    // } else {
+    //     Vec::new()
+    // };
+    //
+    // let mut try_into = if nodyn_enum.features.try_into {
+    //     nodyn_enum.generate_try_from()
+    // } else {
+    //     Vec::new()
+    // };
+    let features = nodyn_enum.generate_features();
     let impl_blocks = nodyn_enum.generate_impl_blocks();
     let trait_blocks = nodyn_enum.generate_trait_blocks();
-    #[cfg(feature = "introspection")]
-    let type_fns = nodyn_enum.generate_type_to_str();
-    #[cfg(not(feature = "introspection"))]
-    let type_fns = "";
-    #[cfg(feature = "is_as")]
-    let is_as_fn = nodyn_enum.generate_is_as().unwrap();
-    #[cfg(not(feature = "is_as"))]
-    let is_as_fn = "";
+
+    // let mut type_fns = if nodyn_enum.features.introspection {
+    //     nodyn_enum.generate_type_to_str()
+    // } else {
+    //     proc_macro2::TokenStream::new()
+    // };
+    // let mut is_as_fn = if nodyn_enum.features.is_as {
+    //     nodyn_enum.generate_is_as().unwrap()
+    // } else {
+    //     proc_macro2::TokenStream::new()
+    // };
+
+    // // depreciated feature flags only if no features are set
+    //
+    // #[cfg(feature = "from")]
+    // if nodyn_enum.features.none() {
+    //     from = nodyn_enum.generate_from();
+    // }
+    //
+    // #[cfg(feature = "try_into")]
+    // if nodyn_enum.features.none() {
+    //     try_into = nodyn_enum.generate_try_from();
+    // }
+    //
+    // #[cfg(feature = "introspection")]
+    // if nodyn_enum.features.none() {
+    //     type_fns = nodyn_enum.generate_type_to_str();
+    // }
+    //
+    // #[cfg(feature = "is_as")]
+    // if nodyn_enum.features.none() {
+    //     is_as_fn = nodyn_enum.generate_is_as().unwrap();
+    // }
 
     let expanded = quote! {
         #e_num
-        #(#from)*
-        #(#try_into)*
+        #features
         #(#impl_blocks)*
         #(#trait_blocks)*
-        #type_fns
-        #is_as_fn
     };
 
     TokenStream::from(expanded)
