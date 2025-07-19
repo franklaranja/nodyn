@@ -263,7 +263,7 @@
 //! nodyn::nodyn! {
 //!     enum Container { String, Vec<u8> }
 //!
-//!     impl as_is From;
+//!     impl is_as From;
 //! }
 //!
 //! let container: Container = "hello".to_string().into();

@@ -33,7 +33,7 @@ impl Features {
     }
 
     pub(crate) const fn none(self) -> bool {
-        !(self.from && self.try_into && self.is_as && self.introspection)
+        !self.from && !self.try_into && !self.is_as && !self.introspection
     }
 }
 
