@@ -225,22 +225,20 @@ impl NodynEnum {
             #[cfg(feature = "from")]
             let from = self.generate_from();
             #[cfg(not(feature = "from"))]
-            let from = Vec::<&str>::new();
-
+            let from = Vec::<proc_macro2::TokenStream>::new();
             #[cfg(feature = "try_into")]
             let try_into = self.generate_try_from();
             #[cfg(not(feature = "try_into"))]
-            let try_into = Vec::<&str>::new();
+            let try_into = Vec::<proc_macro2::TokenStream>::new();
 
             #[cfg(feature = "introspection")]
             let type_fns = self.generate_type_to_str();
             #[cfg(not(feature = "introspection"))]
-            let type_fns = "";
-
+            let type_fns = proc_macro2::TokenStream::new();
             #[cfg(feature = "is_as")]
             let is_as_fn = self.generate_is_as().unwrap();
             #[cfg(not(feature = "is_as"))]
-            let is_as_fn = "";
+            let is_as_fn = proc_macro2::TokenStream::new();
 
             quote! {
                 #(#from)*
