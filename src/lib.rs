@@ -517,7 +517,6 @@ mod impl_block;
 mod nodyn_enum;
 mod trait_block;
 mod variant;
-mod vec_wrapper;
 mod wrapper_struct;
 
 pub(crate) use feature::Features;
@@ -525,7 +524,6 @@ pub(crate) use impl_block::ImplBlock;
 pub(crate) use nodyn_enum::NodynEnum;
 pub(crate) use trait_block::TraitBlock;
 pub(crate) use variant::Variant;
-pub(crate) use vec_wrapper::VecBuilder;
 pub(crate) use wrapper_struct::WrapperStruct;
 
 /// Creates a wrapper `enum` for a set of types with automatic method and trait delegation.
@@ -541,20 +539,8 @@ pub fn nodyn(input: TokenStream) -> TokenStream {
     let collection_structs = nodyn_enum
         .collection_structs
         .iter()
-        .map(|s| s.vec_wrapper_struct(&nodyn_enum.ident, &nodyn_enum.generics))
+        .map(|s| s.vec_wrapper_struct(&nodyn_enum))
         .collect::<Vec<_>>();
-    let vec_wrappers = nodyn_enum
-        .vec_wrappers
-        .iter()
-        .map(|i| {
-            VecBuilder::wrapper_struct(
-                &nodyn_enum.visibility,
-                i,
-                &nodyn_enum.ident,
-                &nodyn_enum.generics,
-            )
-        })
-        .collect::<Vec<proc_macro2::TokenStream>>();
 
     let expanded = quote! {
         #e_num
@@ -563,7 +549,6 @@ pub fn nodyn(input: TokenStream) -> TokenStream {
         #(#trait_blocks)*
 
         #(#collection_structs)*
-        #(#vec_wrappers)*
     };
 
     TokenStream::from(expanded)

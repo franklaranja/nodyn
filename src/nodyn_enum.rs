@@ -1,15 +1,16 @@
-use crate::{keyword, Features, Variant, WrapperStruct};
-use crate::{ImplBlock, TraitBlock};
+use core::option::Option::None; // for analyzer
+use std::collections::HashSet;
+
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use std::collections::HashSet;
-use syn::Type;
 use syn::{
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     spanned::Spanned,
-    Attribute, FnArg, Generics, Ident, Token, Visibility,
+    Attribute, FnArg, Generics, Ident, Token, Type, Visibility,
 };
+
+use crate::{keyword, Features, ImplBlock, TraitBlock, Variant, WrapperStruct};
 
 mod kw {
     syn::custom_keyword!(from);
@@ -23,12 +24,10 @@ pub(crate) struct NodynEnum {
     pub(crate) _keyword: syn::token::Enum,
     pub(crate) ident: Ident,
     pub(crate) generics: Generics,
-    //pub(crate) variants: BTreeMap<String, Variant>,
     pub(crate) variants: Vec<Variant>,
     pub(crate) impl_blocks: Vec<ImplBlock>,
     pub(crate) trait_blocks: Vec<TraitBlock>,
     pub(crate) features: Features,
-    pub(crate) vec_wrappers: Vec<Ident>,
     pub(crate) collection_structs: Vec<WrapperStruct>,
 }
 
@@ -44,7 +43,6 @@ impl Parse for NodynEnum {
             impl_blocks: Vec::new(),
             trait_blocks: Vec::new(),
             features: Features::default(),
-            vec_wrappers: Vec::new(),
             collection_structs: Vec::new(),
         };
 
@@ -67,11 +65,19 @@ impl Parse for NodynEnum {
                 let _keyword = input.parse::<syn::token::Impl>()?;
                 if input.peek(keyword::vec) {
                     let _kw = input.parse::<keyword::vec>()?;
-                    wrapper.vec_wrappers.push(if input.peek(Ident) {
+                    let ident = if input.peek(Ident) {
                         input.parse::<Ident>()?
                     } else {
                         Ident::new(&format!("{}Vec", wrapper.ident), Span::call_site())
-                    });
+                    };
+                    wrapper
+                        .collection_structs
+                        .push(WrapperStruct::standard_vec_wrapper(
+                            ident,
+                            &wrapper.visibility,
+                            &wrapper.ident,
+                            &wrapper.generics,
+                        ));
                     if input.peek(Token![;]) {
                         let _ = input.parse::<syn::token::Semi>()?;
                     }
@@ -105,6 +111,45 @@ impl Parse for NodynEnum {
 }
 
 impl NodynEnum {
+    pub(crate) fn generic_params<'a>(&'a self, generics: &'a Generics) -> TokenStream {
+        let generics = self
+            .generics
+            .params
+            .iter()
+            .chain(generics.params.iter())
+            .collect::<Vec<_>>();
+
+        if generics.is_empty() {
+            TokenStream::new()
+        } else {
+            quote! { < #(#generics ,)* > }
+        }
+    }
+
+    pub(crate) fn enum_generic_params(&self) -> TokenStream {
+        let generics = self.generics.params.iter().collect::<Vec<_>>();
+        if generics.is_empty() {
+            TokenStream::new()
+        } else {
+            quote! { < #(#generics ,)* > }
+        }
+    }
+
+    pub(crate) fn where_clause(&self, generics: &Generics) -> TokenStream {
+        // (Option<&'static str>, Vec<&'a WherePredicate>) {
+        let predicates = match (&self.generics.where_clause, &generics.where_clause) {
+            (Some(w), None) | (None, Some(w)) => w.predicates.iter().collect::<Vec<_>>(),
+            (Some(w1), Some(w2)) => w1
+                .predicates
+                .iter()
+                .chain(w2.predicates.iter())
+                .collect::<Vec<_>>(),
+
+            (None, None) => return TokenStream::new(),
+        };
+        quote! {where: #(#predicates ,)* }
+    }
+
     pub(crate) fn enum_variants(&self) -> Vec<TokenStream> {
         self.variants.iter().map(Variant::enum_variant).collect()
     }

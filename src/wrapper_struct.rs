@@ -1,65 +1,75 @@
 use core::option::Option::None;
 use proc_macro2::{Ident, Span, TokenStream, TokenTree};
-use quote::quote;
+use quote::{quote, ToTokens};
 use syn::spanned::Spanned;
 use syn::{
     parse::{Parse, ParseStream},
-    Fields, Generics, ItemStruct, Meta,
+    parse_quote, Fields, Generics, ItemStruct, Meta, Visibility,
 };
+
+use crate::NodynEnum;
 
 #[derive(Debug, Clone)]
 pub(crate) struct WrapperStruct {
     pub(crate) wrapper: ItemStruct,
+    // pub(crate) ident: Ident,
     pub(crate) vec_field: Option<Ident>,
+    pub(crate) custom_struct: bool,
 }
 
 impl WrapperStruct {
-    pub(crate) fn vec_wrapper_struct(
-        &self,
+    pub(crate) fn standard_vec_wrapper(
+        ident: Ident,
+        vis: &Visibility,
         enum_ident: &Ident,
         generics: &Generics,
-    ) -> TokenStream {
-        let vis = &self.wrapper.vis;
-        let ident = &self.wrapper.ident;
-        let generic_params = &self
-            .wrapper
-            .generics
-            .params
-            .iter()
-            .chain(generics.params.iter())
-            // .cloned()
-            // .map(|g| g.to_token_stream())
-            .collect::<Vec<_>>();
-
-        let (where_kw, where_clauses) =
-            match (&generics.where_clause, &self.wrapper.generics.where_clause) {
-                (Some(w), None) | (None, Some(w)) => (
-                    Some("where: "),
-                    w.predicates.iter().cloned().collect::<Vec<_>>(),
-                ),
-                (Some(w1), Some(w2)) => (
-                    Some("where:"),
-                    w1.predicates
-                        .iter()
-                        .chain(w2.predicates.iter())
-                        .cloned()
-                        .collect::<Vec<_>>(),
-                ),
-                (None, None) => (None, Vec::new()),
-            };
-        let fields = if let Fields::Named(fields) = &self.wrapper.fields {
-            fields.named.iter().collect::<Vec<_>>()
-        } else {
-            Vec::new()
-        };
-        let default_field = Ident::new("inner", Span::call_site());
-        let inner = self.vec_field.as_ref().unwrap_or(&default_field);
-        quote! {
-            #vis struct #ident < #(#generic_params ,)* >
-            #where_kw #(#where_clauses ,)* {
-                #(#fields ,)*
-                #inner: std::vec::Vec< #enum_ident #generics >,
+    ) -> Self {
+        let pound = syn::token::Pound::default();
+        // let vis = &nodyn.visibility;
+        // let generics = &nodyn.generics;
+        // let enum_ident = &nodyn.ident;
+        let wrapper: ItemStruct = parse_quote! {
+            #pound [derive(Debug, Default)]
+            #vis struct #ident #generics {
+                inner: std::vec::Vec< #enum_ident #generics >,
             }
+        };
+        Self {
+            wrapper,
+            // ident,
+            vec_field: Some(Ident::new("inner", Span::call_site())),
+            custom_struct: false,
+        }
+    }
+
+    pub(crate) fn vec_wrapper_struct(&self, nodyn: &NodynEnum) -> TokenStream {
+        if self.vec_field.is_none() {
+            return TokenStream::new();
+        }
+        if self.custom_struct {
+            let enum_ident = &nodyn.ident;
+            let generics = nodyn.enum_generic_params();
+            let vis = &self.wrapper.vis;
+            let ident = &self.wrapper.ident;
+            let generic_params = nodyn.generic_params(&self.wrapper.generics);
+
+            let where_clause = nodyn.where_clause(&self.wrapper.generics);
+            let fields = if let Fields::Named(fields) = &self.wrapper.fields {
+                fields.named.iter().collect::<Vec<_>>()
+            } else {
+                Vec::new()
+            };
+            let default_field = Ident::new("inner", Span::call_site());
+            let inner = self.vec_field.as_ref().unwrap_or(&default_field);
+            quote! {
+                #vis struct #ident #generic_params
+                #where_clause {
+                    #(#fields ,)*
+                    #inner: std::vec::Vec< #enum_ident #generics >,
+                }
+            }
+        } else {
+            self.wrapper.to_token_stream()
         }
     }
 }
@@ -101,6 +111,11 @@ impl Parse for WrapperStruct {
         }
         wrapper.attrs = attrs;
 
-        Ok(Self { wrapper, vec_field })
+        Ok(Self {
+            // ident: wrapper.ident.clone(),
+            wrapper,
+            vec_field,
+            custom_struct: true,
+        })
     }
 }

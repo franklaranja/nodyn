@@ -1,16 +1,19 @@
 use proc_macro2::TokenStream;
-use syn::{Generics, Ident, Visibility};
+use quote::quote;
+use syn::Ident;
+
+use crate::NodynEnum;
 
 pub(crate) struct VecBuilder;
 
 impl VecBuilder {
-    pub(crate) fn wrapper_struct(
-        vis: &Visibility,
-        ident: &Ident,
-        enum_ident: &Ident,
-        generics: &Generics,
-    ) -> TokenStream {
-        quote::quote! {
+    pub(crate) fn wrapper_struct(nodyn: &NodynEnum, ident: &Ident) -> TokenStream {
+        let pound = syn::token::Pound::default();
+        let vis = &nodyn.visibility;
+        let generics = &nodyn.generics;
+        let enum_ident = &nodyn.ident;
+        quote! {
+            #pound [derive(Debug, Default)]
             #vis struct #ident #generics {
                 inner: std::vec::Vec< #enum_ident #generics >,
             }
