@@ -517,12 +517,16 @@ mod impl_block;
 mod nodyn_enum;
 mod trait_block;
 mod variant;
+mod vec_wrapper;
+mod wrapper_struct;
 
-pub(crate) use feature::{keyword, Features};
+pub(crate) use feature::Features;
 pub(crate) use impl_block::ImplBlock;
 pub(crate) use nodyn_enum::NodynEnum;
 pub(crate) use trait_block::TraitBlock;
 pub(crate) use variant::Variant;
+pub(crate) use vec_wrapper::VecBuilder;
+pub(crate) use wrapper_struct::WrapperStruct;
 
 /// Creates a wrapper `enum` for a set of types with automatic method and trait delegation.
 #[allow(clippy::missing_panics_doc)]
@@ -531,60 +535,44 @@ pub fn nodyn(input: TokenStream) -> TokenStream {
     let nodyn_enum = parse_macro_input!(input as NodynEnum);
 
     let e_num = nodyn_enum.generate_enum();
-    // let mut from = if nodyn_enum.features.from {
-    //     nodyn_enum.generate_from()
-    // } else {
-    //     Vec::new()
-    // };
-    //
-    // let mut try_into = if nodyn_enum.features.try_into {
-    //     nodyn_enum.generate_try_from()
-    // } else {
-    //     Vec::new()
-    // };
     let features = nodyn_enum.generate_features();
     let impl_blocks = nodyn_enum.generate_impl_blocks();
     let trait_blocks = nodyn_enum.generate_trait_blocks();
-
-    // let mut type_fns = if nodyn_enum.features.introspection {
-    //     nodyn_enum.generate_type_to_str()
-    // } else {
-    //     proc_macro2::TokenStream::new()
-    // };
-    // let mut is_as_fn = if nodyn_enum.features.is_as {
-    //     nodyn_enum.generate_is_as().unwrap()
-    // } else {
-    //     proc_macro2::TokenStream::new()
-    // };
-
-    // // depreciated feature flags only if no features are set
-    //
-    // #[cfg(feature = "from")]
-    // if nodyn_enum.features.none() {
-    //     from = nodyn_enum.generate_from();
-    // }
-    //
-    // #[cfg(feature = "try_into")]
-    // if nodyn_enum.features.none() {
-    //     try_into = nodyn_enum.generate_try_from();
-    // }
-    //
-    // #[cfg(feature = "introspection")]
-    // if nodyn_enum.features.none() {
-    //     type_fns = nodyn_enum.generate_type_to_str();
-    // }
-    //
-    // #[cfg(feature = "is_as")]
-    // if nodyn_enum.features.none() {
-    //     is_as_fn = nodyn_enum.generate_is_as().unwrap();
-    // }
+    let collection_structs = nodyn_enum
+        .collection_structs
+        .iter()
+        .map(|s| s.vec_wrapper_struct(&nodyn_enum.ident, &nodyn_enum.generics))
+        .collect::<Vec<_>>();
+    let vec_wrappers = nodyn_enum
+        .vec_wrappers
+        .iter()
+        .map(|i| {
+            VecBuilder::wrapper_struct(
+                &nodyn_enum.visibility,
+                i,
+                &nodyn_enum.ident,
+                &nodyn_enum.generics,
+            )
+        })
+        .collect::<Vec<proc_macro2::TokenStream>>();
 
     let expanded = quote! {
         #e_num
         #features
         #(#impl_blocks)*
         #(#trait_blocks)*
+
+        #(#collection_structs)*
+        #(#vec_wrappers)*
     };
 
     TokenStream::from(expanded)
+}
+
+pub(crate) mod keyword {
+    syn::custom_keyword!(vec);
+    syn::custom_keyword!(From);
+    syn::custom_keyword!(TryInto);
+    syn::custom_keyword!(is_as);
+    syn::custom_keyword!(introspection);
 }

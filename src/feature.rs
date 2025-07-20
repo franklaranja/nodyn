@@ -1,11 +1,6 @@
 use syn::{parse::Parse, Token};
 
-pub(crate) mod keyword {
-    syn::custom_keyword!(From);
-    syn::custom_keyword!(TryInto);
-    syn::custom_keyword!(is_as);
-    syn::custom_keyword!(introspection);
-}
+use crate::keyword;
 
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Copy, Clone, Default)]

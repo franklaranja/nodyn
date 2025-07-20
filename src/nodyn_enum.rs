@@ -1,6 +1,6 @@
-use crate::{keyword, Features, Variant};
+use crate::{keyword, Features, Variant, WrapperStruct};
 use crate::{ImplBlock, TraitBlock};
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use std::collections::HashSet;
 use syn::Type;
@@ -10,6 +10,7 @@ use syn::{
     spanned::Spanned,
     Attribute, FnArg, Generics, Ident, Token, Visibility,
 };
+
 mod kw {
     syn::custom_keyword!(from);
     syn::custom_keyword!(str);
@@ -27,6 +28,8 @@ pub(crate) struct NodynEnum {
     pub(crate) impl_blocks: Vec<ImplBlock>,
     pub(crate) trait_blocks: Vec<TraitBlock>,
     pub(crate) features: Features,
+    pub(crate) vec_wrappers: Vec<Ident>,
+    pub(crate) collection_structs: Vec<WrapperStruct>,
 }
 
 impl Parse for NodynEnum {
@@ -41,6 +44,8 @@ impl Parse for NodynEnum {
             impl_blocks: Vec::new(),
             trait_blocks: Vec::new(),
             features: Features::default(),
+            vec_wrappers: Vec::new(),
+            collection_structs: Vec::new(),
         };
 
         let mut existing_types = HashSet::new();
@@ -60,24 +65,33 @@ impl Parse for NodynEnum {
         loop {
             if input.peek(Token![impl]) {
                 let _keyword = input.parse::<syn::token::Impl>()?;
-                // features
-                if input.peek(keyword::From)
+                if input.peek(keyword::vec) {
+                    let _kw = input.parse::<keyword::vec>()?;
+                    wrapper.vec_wrappers.push(if input.peek(Ident) {
+                        input.parse::<Ident>()?
+                    } else {
+                        Ident::new(&format!("{}Vec", wrapper.ident), Span::call_site())
+                    });
+                    if input.peek(Token![;]) {
+                        let _ = input.parse::<syn::token::Semi>()?;
+                    }
+                } else if input.peek(keyword::From)
                     || input.peek(keyword::TryInto)
                     || input.peek(keyword::is_as)
                     || input.peek(keyword::introspection)
                 {
                     wrapper.features.merge(input.parse::<Features>()?);
-
-                    // impl of a trait if followed by an identi
                 } else if input.peek(Ident) {
                     wrapper.trait_blocks.push(input.parse::<TraitBlock>()?);
                 } else {
                     wrapper.impl_blocks.push(input.parse::<ImplBlock>()?);
                 }
+            } else if let Ok(wrapper_struct) = input.parse::<WrapperStruct>() {
+                wrapper.collection_structs.push(wrapper_struct);
             } else if !input.is_empty() {
                 return Err(syn::Error::new(
                     input.lookahead1().error().span(),
-                    "only 'impl' items are supported",
+                    "only 'impl' and struct items are supported",
                 ));
             } else {
                 break;
