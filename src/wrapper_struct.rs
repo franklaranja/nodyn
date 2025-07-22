@@ -1,12 +1,12 @@
 use core::option::Option::None;
 use proc_macro2::{Ident, Span, TokenStream, TokenTree};
-use quote::{ToTokens, quote};
+use quote::{quote, ToTokens};
 use syn::spanned::Spanned;
 use syn::{
-    Attribute, Fields, GenericParam, Generics, ItemStruct, Meta, Token, Visibility, WherePredicate,
     parse::{Parse, ParseStream, Parser},
     parse_quote,
     punctuated::Punctuated,
+    Attribute, Fields, GenericParam, Generics, ItemStruct, Meta, Token, Visibility, WherePredicate,
 };
 
 use crate::{GenericsExt, NodynEnum};
@@ -78,11 +78,15 @@ impl WrapperStruct {
         // println!("{}", deref_impl.to_string());
         let traits = &self.vec_traits(nodyn);
         let clone_traits = &self.vec_clone_traits_and_functions(nodyn);
+        let clone_default = &self.vec_clone_default_traits(nodyn);
+        let default = &self.vec_default_traits_and_methods(nodyn);
         quote! {
             #wrapper_struct
             #general_impl
             #traits
+            #default
             #clone_traits
+            #clone_default
         }
     }
 
@@ -95,14 +99,12 @@ impl WrapperStruct {
         let where_clause = self.where_clause(nodyn);
         // let vis = &self.wrapper.vis;
         let ident = &self.wrapper.ident;
-        let type_assoc = &self.vec_default_methods();
         let fns = &self.vec_standard_functions(nodyn);
         let changed_fns = &self.vec_changed_functions(nodyn);
         let partial_eq_fns = &self.vec_partial_eq_methods();
 
         quote! {
             impl #generics #ident #generics #where_clause {
-                #type_assoc
                 #fns
                #changed_fns
                #partial_eq_fns
@@ -209,6 +211,10 @@ impl WrapperStruct {
         }
     }
 
+    /// - `From<Self> for Vec<enum>`
+    /// - `Index` & `IndexMut`
+    /// - 3x `IntoIterator`
+    /// - `AsRef` & `AsMut` for `Self`, `Vec<enum>` and `&[enum]`
     pub(crate) fn vec_traits(&self, nodyn: &NodynEnum) -> TokenStream {
         if self.vec_field.is_none() {
             return TokenStream::new();
@@ -237,6 +243,12 @@ impl WrapperStruct {
             self.merge_generics(nodyn, &index_g, &index_w)
         };
         quote! {
+            impl #generics From<#ident #generics> for Vec<#enum_ident #enum_generics> #where_clause {
+                fn from(v: #ident #generics) -> Vec<#enum_ident #enum_generics> {
+                    v.#field
+                }
+            }
+
             impl #index_generics ::core::ops::Index<#new_type> for #ident #generics #index_where {
                 type Output = #new_type::Output;
                 #[inline]
@@ -276,37 +288,102 @@ impl WrapperStruct {
                 }
             }
 
+            impl #generics ::core::convert::AsRef<#ident #generics> for #ident #generics #where_clause  {
+                fn as_ref(&self) -> &Self {
+                    self
+                }
+            }
+
+            impl #generics ::core::convert::AsMut<#ident #generics> for #ident #generics #where_clause {
+                fn as_mut(&mut self) -> &mut Self {
+                    self
+                }
+            }
+
+            impl #generics ::core::convert::AsRef<Vec<#enum_ident #enum_generics>> for #ident #generics #where_clause  {
+                fn as_ref(&self) -> &Vec<#enum_ident #enum_generics> {
+                    &self.#field
+                }
+            }
+
+            impl #generics ::core::convert::AsMut<Vec<#enum_ident #enum_generics>> for #ident #generics #where_clause {
+                fn as_mut(&mut self) -> &mut Vec<#enum_ident #enum_generics> {
+                    &mut self.#field
+                }
+            }
+
+            impl #generics ::core::convert::AsRef<[#enum_ident #enum_generics]> for #ident #generics #where_clause {
+                fn as_ref(&self) -> &[#enum_ident #enum_generics] {
+                    &self.#field
+                }
+            }
+
+            impl #generics ::core::convert::AsMut<[#enum_ident #enum_generics]> for #ident #generics #where_clause {
+                fn as_mut(&mut self) -> &mut [#enum_ident #enum_generics] {
+                    &mut self.#field
+                }
+            }
         }
     }
 
     /// Vec wrapper methods that depend on the `Default` trait:
     ///
+    /// traits
+    /// - 'From<Vec<enum>>'
+    /// - `FromIterator<enum>`
+    ///
+    /// methods:
     /// - [`fn new() -> Self`](Vec::new())
     /// - [`fn with_capacity(capacity: usize) -> Self`](Vec::with_capacity())
     /// - `fn split_off(&mut self, at: usize) -> Self` the returned Self uses default to set other
-    pub(crate) fn vec_default_methods(&self) -> TokenStream {
+    pub(crate) fn vec_default_traits_and_methods(&self, nodyn: &NodynEnum) -> TokenStream {
         if self.vec_field.is_none() || !self.traits.contains(&"Default".to_string()) {
             return TokenStream::new();
         }
         let field = self.vec_field.as_ref().unwrap();
+        let wrapper_ident = &self.wrapper.ident;
+        let enum_ident = &nodyn.ident;
         let vis = &self.wrapper.vis;
-
+        let wrapper_generics = self.generic_params(nodyn);
+        let where_clause = self.where_clause(nodyn);
+        let enum_generics = nodyn.enum_generic_params();
+        let new_type = &nodyn.generics.new_type();
         quote! {
-            #vis fn new() -> Self {
-                Self::default()
-            }
-
-            #vis fn with_capacity(capacity: usize) -> Self {
-                Self {
-                    #field: std::vec::Vec::with_capacity(capacity),
-                    ..::core::default::Default::default()
+            impl #wrapper_generics ::core::convert::From<::std::vec::Vec<#enum_ident #enum_generics>> for #wrapper_ident #wrapper_generics #where_clause {
+                fn from(v: ::std::vec::Vec<#enum_ident #enum_generics>) -> #wrapper_ident #wrapper_generics {
+                    Self {
+                       #field: v,
+                        ..::core::default::Default::default()
+                    }
                 }
             }
 
-            #vis fn split_off(&mut self, at: usize) -> Self {
-                Self {
-                    #field: self.#field.split_off(at),
-                    ..::core::default::Default::default()
+            impl #wrapper_generics ::core::iter::FromIterator<#enum_ident #enum_generics> for #wrapper_ident #wrapper_generics #where_clause {
+                fn from_iter<#new_type: IntoIterator<Item = #enum_ident #enum_generics>>(iter: #new_type) -> #wrapper_ident #wrapper_generics {
+                    Self {
+                        #field: ::std::vec::Vec::from_iter(iter),
+                        .. ::core::default::Default::default()
+                    }
+                }
+            }
+
+            impl #wrapper_generics #wrapper_ident #wrapper_generics #where_clause {
+                #vis fn new() -> Self {
+                    Self::default()
+                }
+
+                #vis fn with_capacity(capacity: usize) -> Self {
+                    Self {
+                        #field: ::std::vec::Vec::with_capacity(capacity),
+                        ..::core::default::Default::default()
+                    }
+                }
+
+                #vis fn split_off(&mut self, at: usize) -> Self {
+                    Self {
+                        #field: self.#field.split_off(at),
+                        ..::core::default::Default::default()
+                    }
                 }
             }
         }
@@ -324,6 +401,43 @@ impl WrapperStruct {
         quote! {
             #vis fn dedup(&mut self) {
                 self.#field.dedup()
+            }
+        }
+    }
+
+    /// - `From<&[enum]>`
+    /// - `From<&mut [enum]>`
+    pub(crate) fn vec_clone_default_traits(&self, nodyn: &NodynEnum) -> TokenStream {
+        if self.vec_field.is_none()
+            || (!self.traits.contains(&"Clone".to_string())
+                && !self.traits.contains(&"Default".to_string()))
+        {
+            return TokenStream::new();
+        }
+        let field = self.vec_field.as_ref().unwrap();
+        let wrapper_ident = &self.wrapper.ident;
+        let enum_ident = &nodyn.ident;
+        // let vis = &self.wrapper.vis;
+        let wrapper_generics = self.generic_params(nodyn);
+        let where_clause = self.where_clause(nodyn);
+        let enum_generics = nodyn.enum_generic_params();
+        quote! {
+            impl #wrapper_generics ::core::convert::From<&[#enum_ident #enum_generics]> for #wrapper_ident #wrapper_generics #where_clause {
+                fn from(s: &[#enum_ident #enum_generics]) -> #wrapper_ident #wrapper_generics {
+                    Self {
+                       #field: s.to_vec(),
+                        ..::core::default::Default::default()
+                    }
+                }
+            }
+
+            impl #wrapper_generics ::core::convert::From<&mut [#enum_ident #enum_generics]> for #wrapper_ident #wrapper_generics #where_clause {
+                fn from(s: &mut [#enum_ident #enum_generics]) -> #wrapper_ident #wrapper_generics {
+                    Self {
+                       #field: s.to_vec(),
+                        ..::core::default::Default::default()
+                    }
+                }
             }
         }
     }
@@ -354,7 +468,7 @@ impl WrapperStruct {
         let new_type = &nodyn.generics.new_type();
 
         quote! {
-            impl #wrapper_generics Extend<#enum_ident #enum_generics> for #wrapper_ident #wrapper_generics #where_clause {
+            impl #wrapper_generics ::core::iter::Extend<#enum_ident #enum_generics> for #wrapper_ident #wrapper_generics #where_clause {
                 fn extend<#new_type: ::core::iter::IntoIterator<Item = #enum_ident #enum_generics>>(&mut self, iter: #new_type) {
                     self.#field.extend(iter.into_iter())
                 }

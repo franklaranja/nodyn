@@ -1,5 +1,5 @@
 nodyn::nodyn! {
-  #[derive(Debug, PartialEq)]
+  #[derive(Debug, PartialEq, Clone)]
   pub enum Foo<'a> {
     &'a str,
     u32,
