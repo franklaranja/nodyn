@@ -651,6 +651,7 @@ pub(crate) trait GenericsExt {
     fn contains_type(&self, other: &str) -> bool;
     fn new_lifetime(&self) -> Lifetime;
     fn new_type(&self) -> Ident;
+    fn new_types(&self, count: u8) -> Vec<Ident>;
 }
 
 impl GenericsExt for Generics {
@@ -665,7 +666,7 @@ impl GenericsExt for Generics {
     }
 
     fn new_lifetime(&self) -> Lifetime {
-        for c in ('a'..='z').into_iter().rev() {
+        for c in ('a'..='z').rev() {
             let l = format!("'{c}");
             if !self.contains_lifetime(&l) {
                 return Lifetime::new(&l, Span::call_site());
@@ -682,5 +683,20 @@ impl GenericsExt for Generics {
             }
         }
         panic!("no new lifetime available");
+    }
+
+    fn new_types(&self, mut count: u8) -> Vec<Ident> {
+        let mut result = Vec::new();
+        for c in 'A'..='Z' {
+            let l = c.to_string();
+            if !self.contains_type(&l) {
+                result.push(Ident::new(&l, Span::call_site()));
+                count -= 1;
+                if count == 0 {
+                    return result;
+                }
+            }
+        }
+        result
     }
 }
