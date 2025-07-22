@@ -1,12 +1,13 @@
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
+use quote::{quote, ToTokens};
 use syn::{
-    Attribute, FnArg, GenericArgument, Ident, PathArguments, Token, Type, TypeArray, TypePath,
-    TypeReference, TypeTuple, parenthesized,
+    parenthesized,
     parse::Parse,
     punctuated::Punctuated,
     spanned::Spanned,
     token::{Comma, Paren},
+    Attribute, FnArg, GenericArgument, Ident, PathArguments, Token, Type, TypeArray, TypePath,
+    TypeReference, TypeTuple,
 };
 
 #[derive(Debug, Clone)]
@@ -125,6 +126,105 @@ impl Variant {
 
     pub(crate) fn ident_as_snake(&self) -> String {
         camel_to_snake(&self.ident.to_string())
+    }
+
+    pub(crate) fn vec_fns(&self, enum_ident: &Ident, vec_field: &Ident) -> TokenStream {
+        let ident = &self.ident;
+        let ty = &self.ty;
+        let snake = self.ident_as_snake();
+        let type_name = self.type_as_string();
+
+        let fn_first = Ident::new(&format!("first_{snake}"), ty.span());
+        let fn_first_doc = format!("Returns the first `{ident}` as `Option<&{type_name}>`");
+
+        let fn_first_mut = Ident::new(&format!("first_{snake}_mut"), ty.span());
+        let fn_first_mut_doc = format!("Returns the first `{ident}` as `Option<&mut {type_name}>`");
+
+        let fn_last = Ident::new(&format!("last_{snake}"), ty.span());
+        let fn_last_doc = format!("Returns the last `{ident}` as `Option<&{type_name}>`");
+
+        let fn_last_mut = Ident::new(&format!("last_{snake}_mut"), ty.span());
+        let fn_last_mut_doc = format!("Returns the last `{ident}` as `Option<&mut {type_name}>`");
+
+        let fn_iter = Ident::new(&format!("iter_{snake}"), ty.span());
+        let fn_iter_doc = format!("Iterator over variant `{ident}` as `&{type_name}`");
+
+        let fn_iter_mut = Ident::new(&format!("iter_{snake}_mut"), ty.span());
+        let fn_iter_mut_doc = format!("Iterator over variant `{ident}` as `&mut {type_name}`");
+
+        let fn_count = Ident::new(&format!("count_{snake}"), ty.span());
+        let fn_count_doc = format!("Counts all variants `{ident}` in `{enum_ident}`");
+
+        quote! {
+            #[doc = #fn_first_doc]
+            fn #fn_first(&self) -> ::core::option::Option<&#ty> {
+                for i in &self.#vec_field {
+                    if let #enum_ident::#ident(value) = i {
+                        return ::core::option::Option::Some(value)
+                    }
+                }
+                ::core::option::Option::None
+            }
+
+            #[doc = #fn_first_mut_doc]
+            fn #fn_first_mut(&mut self) -> ::core::option::Option<&mut #ty> {
+                for i in &mut self.#vec_field {
+                    if let #enum_ident::#ident(value) = i {
+                        return ::core::option::Option::Some(value)
+                    }
+                }
+                ::core::option::Option::None
+            }
+
+            #[doc = #fn_last_doc]
+            fn #fn_last(&self) -> ::core::option::Option<&#ty> {
+                for i in self.#vec_field.iter().rev() {
+                    if let #enum_ident::#ident(value) = i {
+                        return ::core::option::Option::Some(value)
+                    }
+                }
+                ::core::option::Option::None
+            }
+
+            #[doc = #fn_last_mut_doc]
+            fn #fn_last_mut(&mut self) -> ::core::option::Option<&mut #ty> {
+                for i in self.#vec_field.iter_mut().rev() {
+                    if let #enum_ident::#ident(value) = i {
+                        return ::core::option::Option::Some(value)
+                    }
+                }
+                ::core::option::Option::None
+            }
+
+            #[doc = #fn_iter_doc]
+            pub fn #fn_iter(&self) -> impl ::core::iter::Iterator<Item = &#ty> {
+                self.#vec_field.iter().filter_map(|item| {
+                    if let #enum_ident::#ident(value) = item {
+                        Some(value)
+                    } else {
+                        None
+                    }
+                })
+            }
+
+            #[doc = #fn_iter_mut_doc]
+            pub fn #fn_iter_mut(&mut self) -> impl ::core::iter::Iterator<Item = &mut #ty> {
+                self.#vec_field.iter_mut().filter_map(|item| {
+                    if let #enum_ident::#ident(value) = item {
+                        Some(value)
+                    } else {
+                        None
+                    }
+                })
+            }
+
+            #[doc = #fn_count_doc]
+            pub fn #fn_count(&self) -> usize {
+                self.#vec_field.iter().filter(|item| {
+                    ::std::matches!(item, #enum_ident::#ident(_))
+                }).count()
+            }
+        }
     }
 }
 

@@ -1,12 +1,12 @@
 use core::option::Option::None;
 use proc_macro2::{Ident, Span, TokenStream, TokenTree};
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use syn::spanned::Spanned;
 use syn::{
+    Attribute, Fields, GenericParam, Generics, ItemStruct, Meta, Token, Visibility, WherePredicate,
     parse::{Parse, ParseStream, Parser},
     parse_quote,
     punctuated::Punctuated,
-    Attribute, Fields, GenericParam, Generics, ItemStruct, Meta, Token, Visibility, WherePredicate,
 };
 
 use crate::{GenericsExt, NodynEnum};
@@ -94,20 +94,21 @@ impl WrapperStruct {
         if self.vec_field.is_none() {
             return TokenStream::new();
         }
-        // let enum_ident = &nodyn.ident;
         let generics = self.generic_params(nodyn);
         let where_clause = self.where_clause(nodyn);
-        // let vis = &self.wrapper.vis;
         let ident = &self.wrapper.ident;
         let fns = &self.vec_standard_functions(nodyn);
         let changed_fns = &self.vec_changed_functions(nodyn);
         let partial_eq_fns = &self.vec_partial_eq_methods();
+        let field = self.vec_field.as_ref().unwrap();
+        let variant_fns = nodyn.generate_variant_vec_fns(field);
 
         quote! {
             impl #generics #ident #generics #where_clause {
                 #fns
-               #changed_fns
-               #partial_eq_fns
+                #changed_fns
+                #partial_eq_fns
+                #variant_fns
             }
         }
     }

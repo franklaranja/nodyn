@@ -4,13 +4,13 @@ use std::collections::HashSet;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{
+    Attribute, FnArg, GenericParam, Generics, Ident, Meta, Token, Type, Visibility, WherePredicate,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     spanned::Spanned,
-    Attribute, FnArg, GenericParam, Generics, Ident, Meta, Token, Type, Visibility, WherePredicate,
 };
 
-use crate::{keyword, Features, ImplBlock, TraitBlock, Variant, WrapperStruct};
+use crate::{Features, ImplBlock, TraitBlock, Variant, WrapperStruct, keyword};
 
 mod kw {
     syn::custom_keyword!(from);
@@ -156,7 +156,7 @@ impl NodynEnum {
             .iter()
             .chain(generics.params.iter())
             .collect::<Vec<_>>();
-        generics.push(&extra);
+        generics.push(extra);
 
         if generics.is_empty() {
             TokenStream::new()
@@ -176,7 +176,7 @@ impl NodynEnum {
 
     pub(crate) fn enum_generic_params_plus(&self, extra: &GenericParam) -> TokenStream {
         let mut generics = self.generics.params.iter().collect::<Vec<_>>();
-        generics.push(&extra);
+        generics.push(extra);
         if generics.is_empty() {
             TokenStream::new()
         } else {
@@ -190,7 +190,7 @@ impl NodynEnum {
         } else {
             Vec::new()
         };
-        where_clause.push(&extra);
+        where_clause.push(extra);
         if where_clause.is_empty() {
             TokenStream::new()
         } else {
@@ -227,7 +227,7 @@ impl NodynEnum {
 
             (None, None) => Vec::new(),
         };
-        predicates.push(&extra);
+        predicates.push(extra);
         quote! {where #(#predicates ,)* }
     }
 
@@ -547,5 +547,15 @@ impl NodynEnum {
                 #(#fns)*
             }
         })
+    }
+
+    pub(crate) fn generate_variant_vec_fns(&self, vec_field: &Ident) -> TokenStream {
+        let fns = self
+            .variants
+            .iter()
+            .map(|v| v.vec_fns(&self.ident, vec_field))
+            .collect::<Vec<_>>();
+
+        quote! { #(#fns)* }
     }
 }

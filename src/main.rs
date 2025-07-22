@@ -35,6 +35,16 @@ fn main() {
             *x = "hello world".into();
         }
     }
+
+    test.push(55);
+
+    println!("first u32 {}", test.first_u32().unwrap());
+    println!("last u32 {}", test.last_u32().unwrap());
+
+    for x in test.iter_u32() {
+        println! {"u32 {x}"}
+    }
+
     for x in test {
         println!("{x:?}");
     }
