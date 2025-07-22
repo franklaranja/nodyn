@@ -1,28 +1,41 @@
 nodyn::nodyn! {
-  #[derive(Debug)]
+  #[derive(Debug, PartialEq)]
   pub enum Foo<'a> {
-    I64,
-    Str<'a>,
-    F64,
+    &'a str,
     u32,
+    f64,
   }
+
+    impl From;
 
   impl vec;
 
   impl vec Bar;
+
   #[vec_wrapper]
+  #[derive(Debug, Default)]
   pub struct MyVec<'b> {
         pub foo: &'b str,
   }
 }
 
-#[derive(Debug)]
-pub struct I64(pub i64);
+fn main() {
+    let mut test = MyVec::default();
+    test.push(33u32);
+    test.push(42u32);
+    test.push("hello");
+    assert_eq!(test.get(0), Some(&Foo::U32(33)));
+    assert_eq!(test[0], Foo::U32(33));
+    for x in &test {
+        println!("{x:?}");
+    }
 
-#[derive(Debug)]
-pub struct Str<'a>(pub &'a str);
-
-#[derive(Debug)]
-pub struct F64(pub f64);
-
-fn main() {}
+    for x in &mut test {
+        if x == &Foo::StrRef("hello") {
+            *x = "hello world".into();
+        }
+    }
+    for x in test {
+        println!("{x:?}");
+    }
+}

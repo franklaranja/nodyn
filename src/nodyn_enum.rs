@@ -7,7 +7,7 @@ use syn::{
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     spanned::Spanned,
-    Attribute, FnArg, Generics, Ident, Token, Type, Visibility,
+    Attribute, FnArg, GenericParam, Generics, Ident, Meta, Token, Type, Visibility, WherePredicate,
 };
 
 use crate::{keyword, Features, ImplBlock, TraitBlock, Variant, WrapperStruct};
@@ -60,10 +60,13 @@ impl Parse for NodynEnum {
             existing_types.insert(variant.ty.clone());
             wrapper.variants.push(variant);
         }
+        let derive_attr = Self::derive_attr(&wrapper.attrs);
+        // println!("Starting impls");
         loop {
             if input.peek(Token![impl]) {
                 let _keyword = input.parse::<syn::token::Impl>()?;
                 if input.peek(keyword::vec) {
+                    // println!("Starting impl standard vec");
                     let _kw = input.parse::<keyword::vec>()?;
                     let ident = if input.peek(Ident) {
                         input.parse::<Ident>()?
@@ -73,10 +76,11 @@ impl Parse for NodynEnum {
                     wrapper
                         .collection_structs
                         .push(WrapperStruct::standard_vec_wrapper(
-                            ident,
+                            &ident,
                             &wrapper.visibility,
                             &wrapper.ident,
                             &wrapper.generics,
+                            &derive_attr,
                         ));
                     if input.peek(Token![;]) {
                         let _ = input.parse::<syn::token::Semi>()?;
@@ -93,6 +97,7 @@ impl Parse for NodynEnum {
                     wrapper.impl_blocks.push(input.parse::<ImplBlock>()?);
                 }
             } else if let Ok(wrapper_struct) = input.parse::<WrapperStruct>() {
+                // println!("Starting impl custom vec");
                 wrapper.collection_structs.push(wrapper_struct);
             } else if !input.is_empty() {
                 return Err(syn::Error::new(
@@ -106,11 +111,25 @@ impl Parse for NodynEnum {
         // println!(
         //     "---------------------------------------------\n{wrapper:#?}\n---------------------------------------------"
         // );
+        // println!("Parsed ok");
         Ok(wrapper)
     }
 }
 
 impl NodynEnum {
+    pub(crate) fn derive_attr(attrs: &[Attribute]) -> Vec<Attribute> {
+        let mut derive_attrs = Vec::new();
+        let ident = Ident::new("derive", Span::call_site());
+        for attr in attrs {
+            if let Meta::List(list) = &attr.meta {
+                if list.path.is_ident(&ident) {
+                    derive_attrs.push(attr.clone());
+                }
+            }
+        }
+        derive_attrs
+    }
+
     pub(crate) fn generic_params<'a>(&'a self, generics: &'a Generics) -> TokenStream {
         let generics = self
             .generics
@@ -118,6 +137,26 @@ impl NodynEnum {
             .iter()
             .chain(generics.params.iter())
             .collect::<Vec<_>>();
+
+        if generics.is_empty() {
+            TokenStream::new()
+        } else {
+            quote! { < #(#generics ,)* > }
+        }
+    }
+
+    pub(crate) fn generic_params_extra<'a>(
+        &'a self,
+        generics: &'a Generics,
+        extra: &GenericParam,
+    ) -> TokenStream {
+        let mut generics = self
+            .generics
+            .params
+            .iter()
+            .chain(generics.params.iter())
+            .collect::<Vec<_>>();
+        generics.push(&extra);
 
         if generics.is_empty() {
             TokenStream::new()
@@ -135,6 +174,29 @@ impl NodynEnum {
         }
     }
 
+    pub(crate) fn enum_generic_params_plus(&self, extra: &GenericParam) -> TokenStream {
+        let mut generics = self.generics.params.iter().collect::<Vec<_>>();
+        generics.push(&extra);
+        if generics.is_empty() {
+            TokenStream::new()
+        } else {
+            quote! { < #(#generics ,)* > }
+        }
+    }
+
+    pub(crate) fn enum_where_plus(&self, extra: &WherePredicate) -> TokenStream {
+        let mut where_clause = if let Some(clause) = &self.generics.where_clause {
+            clause.predicates.iter().collect::<Vec<_>>()
+        } else {
+            Vec::new()
+        };
+        where_clause.push(&extra);
+        if where_clause.is_empty() {
+            TokenStream::new()
+        } else {
+            quote! { where #(#where_clause ,)*  }
+        }
+    }
     pub(crate) fn where_clause(&self, generics: &Generics) -> TokenStream {
         // (Option<&'static str>, Vec<&'a WherePredicate>) {
         let predicates = match (&self.generics.where_clause, &generics.where_clause) {
@@ -147,7 +209,26 @@ impl NodynEnum {
 
             (None, None) => return TokenStream::new(),
         };
-        quote! {where: #(#predicates ,)* }
+        quote! {where #(#predicates ,)* }
+    }
+
+    pub(crate) fn where_clause_extra(
+        &self,
+        generics: &Generics,
+        extra: &WherePredicate,
+    ) -> TokenStream {
+        let mut predicates = match (&self.generics.where_clause, &generics.where_clause) {
+            (Some(w), None) | (None, Some(w)) => w.predicates.iter().collect::<Vec<_>>(),
+            (Some(w1), Some(w2)) => w1
+                .predicates
+                .iter()
+                .chain(w2.predicates.iter())
+                .collect::<Vec<_>>(),
+
+            (None, None) => Vec::new(),
+        };
+        predicates.push(&extra);
+        quote! {where #(#predicates ,)* }
     }
 
     pub(crate) fn enum_variants(&self) -> Vec<TokenStream> {

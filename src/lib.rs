@@ -488,6 +488,87 @@
 //! // array: [null, false, 33, world]
 //! ```
 //!
+//! # `Vec` wrapper
+//!
+//! Nodyn can generate a wrapper around a `Vec` for your `enum`.
+//! It implements many of the [`std::vec::Vec`] methods and changes
+//! some methods to leverage nodyns features. For example `push`
+//! works with `Into` so if you add `impl From` to your enum you
+//! can push any value your enum wraps directly in your vec.
+//!
+//! ### Example
+//!
+//! ```
+//! nodyn::nodyn! {
+//!     #[derive(Debug, Clone)]
+//!     pub enum Value {
+//!         i32,
+//!         String,
+//!         f64,
+//!     }
+//!
+//!     impl From;
+//!
+//!     impl vec; // creates a vec wrapper `ValueVec`
+//!               // with `Debug`, `Clone` + `Default` derived.
+//! }
+//!
+//!
+//!
+//! let mut values = ValueVec::default();
+//! values.push(42);                  // push a Value::I32
+//! values.push("hello".to_string()); // push a Value::String
+//! ```
+//!
+//! ## Simple wrappers
+//!
+//! If you add `impl vec` nodyn will generate a Vec wrapper
+//! named using the enums name with 'Vec' appended and it
+//! will have the same `derive` attributes added as the enum
+//! has. The `Default` trait is always derived. You can add a
+//! name if you don't like the generated one.
+//!
+//! ### Example
+//!
+//! ```
+//! nodyn::nodyn! {
+//!     #[derive(Debug, PartialEq, Clone)]
+//!     pub enum Value {
+//!         i32,
+//!         String,
+//!         f64,
+//!     }
+//!
+//!     impl From;
+//!
+//!     impl vec Values; // creates a vec wrapper `Values`.
+//! }
+//! ```
+//!
+//! ## Traits and generated methods.
+//!
+//! The traits that the wrapper has **using the derive macro**, affects
+//! which methods are generated.
+//!
+//! - **`Default`**: The constructors `new` and `with_capacity`
+//!
+//! ## Implemented traits
+//!
+//! - Indexing via [`std::ops::Index`] and [`std::ops::IndexMut`]
+//! - Iteration: all tree forms of [`std::iter::IntoIterator`]
+//!
+//! ## Custom wrapper
+//!
+//! If you want more control over the wrapper you can specify
+//! your own wrapper struct:
+//!
+//!
+//!
+//! ## Generated `Vec` methods
+//!
+//! - [`fn new() -> Self`](Vec::new()) (needs `Default`)
+//! - [`fn with_capacity() -> Self`](Vec::with_capacity()) (needs `Default`)
+//!
 //! # Features
 //!
 //! These used to be generated using a cargo feature flags, this
@@ -539,7 +620,7 @@ pub fn nodyn(input: TokenStream) -> TokenStream {
     let collection_structs = nodyn_enum
         .collection_structs
         .iter()
-        .map(|s| s.vec_wrapper_struct(&nodyn_enum))
+        .map(|s| s.vec_general_code(&nodyn_enum))
         .collect::<Vec<_>>();
 
     let expanded = quote! {
@@ -560,4 +641,46 @@ pub(crate) mod keyword {
     syn::custom_keyword!(TryInto);
     syn::custom_keyword!(is_as);
     syn::custom_keyword!(introspection);
+}
+
+use proc_macro2::{Ident, Span};
+use syn::{Generics, Lifetime};
+
+pub(crate) trait GenericsExt {
+    fn contains_lifetime(&self, other: &str) -> bool;
+    fn contains_type(&self, other: &str) -> bool;
+    fn new_lifetime(&self) -> Lifetime;
+    fn new_type(&self) -> Ident;
+}
+
+impl GenericsExt for Generics {
+    fn contains_lifetime(&self, other: &str) -> bool {
+        let other = Lifetime::new(other, Span::call_site());
+        self.lifetimes().any(|l| l.lifetime == other)
+    }
+
+    fn contains_type(&self, other: &str) -> bool {
+        let other = Ident::new(other, Span::call_site());
+        self.type_params().any(|t| t.ident == other)
+    }
+
+    fn new_lifetime(&self) -> Lifetime {
+        for c in ('a'..='z').into_iter().rev() {
+            let l = format!("'{c}");
+            if !self.contains_lifetime(&l) {
+                return Lifetime::new(&l, Span::call_site());
+            }
+        }
+        panic!("no new lifetime available");
+    }
+
+    fn new_type(&self) -> Ident {
+        for c in 'A'..='Z' {
+            let l = c.to_string();
+            if !self.contains_type(&l) {
+                return Ident::new(&l, Span::call_site());
+            }
+        }
+        panic!("no new lifetime available");
+    }
 }
