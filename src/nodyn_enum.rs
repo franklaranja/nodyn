@@ -2,15 +2,16 @@ use core::option::Option::None; // for analyzer
 use std::collections::HashSet;
 
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::{ToTokens, format_ident, quote};
 use syn::{
+    Attribute, Expr, FnArg, GenericParam, Generics, Ident, Meta, Path, Token, Type, Visibility,
+    WherePredicate,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     spanned::Spanned,
-    Attribute, FnArg, GenericParam, Generics, Ident, Meta, Token, Type, Visibility, WherePredicate,
 };
 
-use crate::{keyword, MethodImpl, OptionalImpl, TraitImpl, Variant, VecWrapper};
+use crate::{MethodImpl, OptionalImpl, TraitImpl, Variant, VecWrapper, keyword};
 
 // mod kw {
 //     syn::custom_keyword!(from);
@@ -38,11 +39,14 @@ pub(crate) struct NodynEnum {
     pub(crate) optional_impl: OptionalImpl,
     /// Wrapper structs for collections (e.g., `Vec`-based structs).
     pub(crate) vec_wrappers: Vec<VecWrapper>,
+    /// module path to where the macro is invoked used for vec_wrapper macro
+    pub(crate) module_path: Option<Path>,
 }
 
 impl Parse for NodynEnum {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let attrs = input.call(Attribute::parse_outer)?;
+        let (module_path, attrs) = Self::extract_module_path(&attrs);
         let visibility = input.parse::<Visibility>()?;
         let _ = input.parse::<syn::token::Enum>()?;
         let ident = input.parse::<Ident>()?;
@@ -123,11 +127,32 @@ impl Parse for NodynEnum {
             trait_impls: trait_blocks,
             optional_impl: features,
             vec_wrappers: collection_structs,
+            module_path,
         })
     }
 }
 
 impl NodynEnum {
+    /// Extract `nodyn_path` attribute from provide attributes.
+    fn extract_module_path(attrs: &[Attribute]) -> (Option<Path>, Vec<Attribute>) {
+        (attrs.iter()
+            .find(|attr| matches!(&attr.meta, Meta::NameValue(meta) if meta.path.is_ident("module_path")))
+            .map(|attr| {
+                if let Meta::NameValue(meta) = &attr.meta {
+                    syn::parse_str::<Path>(&meta.value.to_token_stream().to_string().replace([' ', '"'],"")).expect("nodyn_path value is no path")
+                } else {
+                    panic!("attribute is not #[module_path = \"some::module\"]");
+                }
+            }),
+
+        attrs
+            .iter()
+            .filter(|attr| !matches!(&attr.meta, Meta::NameValue(meta) if meta.path.is_ident("module_path")))
+            .cloned()
+            .collect()
+            )
+    }
+
     /// Extracts `#[derive]` attributes from the provided attributes.
     fn extract_derive_attrs(attrs: &[Attribute]) -> Vec<Attribute> {
         attrs
@@ -602,10 +627,12 @@ mod tests {
             ",
         );
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Duplicate variant type"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Duplicate variant type")
+        );
     }
 
     #[test]

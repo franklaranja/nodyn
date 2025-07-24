@@ -505,6 +505,38 @@
 //! values.push("hello".to_string()); // push a Value::String
 //! ```
 //!
+//! ## A `vec!` like macro
+//!
+//! Nodyn generates a macro for your vec wrapper with the name
+//! of the wrapper changed to snake case. As the `nodyn!` macro
+//! does not know where it is invoked, you have to tell it the
+//! full module path without the crate name, so the generated macro works
+//! correctly. If you don't specify the module path it is assumed to
+//! be the root of the crate.
+//!
+//! The macro works like `vec!` but accepts any value within your
+//! enum.
+//!
+//! ### Example
+//!
+//! ```ignore
+//! // in src/my/awsome/foo.rs:
+//! nodyn::nodyn! {
+//!     #[module_path = "my::awsome::foo"]
+//!     #[derive(Debug, Clone)]
+//!     pub enum Value<'a> {
+//!         i32,
+//!         &'a str,
+//!         f64,
+//!     }
+//!
+//!     impl vec Values;
+//! }
+//!
+//! // elsewhere after importing values, etc:
+//! let my_values = values!["hello", 42, "world", 0.1];
+//! ````
+//!
 //! ## Simple wrappers
 //!
 //! If you add `impl vec` nodyn will generate a Vec wrapper

@@ -1,15 +1,15 @@
 use core::option::Option::None;
 use proc_macro2::{Ident, Span, TokenStream, TokenTree};
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use syn::spanned::Spanned;
 use syn::{
+    Attribute, Fields, GenericParam, Generics, ItemStruct, Meta, Token, Visibility, WherePredicate,
     parse::{Parse, ParseStream, Parser},
     parse_quote,
     punctuated::Punctuated,
-    Attribute, Fields, GenericParam, Generics, ItemStruct, Meta, Token, Visibility, WherePredicate,
 };
 
-use crate::{camel_to_snake, GenericsExt, NodynEnum};
+use crate::{GenericsExt, NodynEnum, camel_to_snake};
 
 /// Represents a wrapper struct for a collection of enum variants in the `nodyn` crate.
 /// Currently only `Vec` wrappers are supported.
@@ -847,6 +847,14 @@ impl VecWrapper {
         let where_clause = self.to_where(nodyn);
         let enum_generics = nodyn.to_generics();
         let snake_ident = Ident::new(&camel_to_snake(&ident.to_string()), ident.span());
+        let (macro_vec, macro_enum) = if let Some(path) = &nodyn.module_path {
+            (
+                quote! { $crate::#path::#ident },
+                quote! { $crate::#path::#enum_ident },
+            )
+        } else {
+            (quote! { $crate::#ident }, quote! { $crate::#enum_ident })
+        };
 
         quote! {
             impl #generics ::core::convert::From<&[#enum_ident #enum_generics]> for #ident #generics #where_clause {
@@ -871,10 +879,10 @@ impl VecWrapper {
             macro_rules! #snake_ident {
                 () => ( #ident::new() );
                 ($elem:expr; $n:expr) => (
-                    #ident::from( ::std::vec![#enum_ident::from($elem);$n])
+                    #macro_vec::from( ::std::vec![#macro_enum::from($elem);$n])
                 );
                 ($($x:expr),+ $(,)?) => (
-                    #ident::from( ::std::vec![$(#enum_ident::from($x)),+])
+                    #macro_vec::from( ::std::vec![$(#macro_enum::from($x)),+])
                 );
             }
         }
