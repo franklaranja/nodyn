@@ -1,12 +1,33 @@
 //! *Easy polymorphism with enums*
 //!
-//! The `nodyn!` macro generates a Rust `enum` that wraps a fixed set
-//! of types, providing automatic implementations for `From`, `TryFrom`,
-//! and delegated methods or traits. This is useful when you need to store
-//! values of different types in a type-safe way without the overhead of trait
-//! objects.
+//! The `nodyn!` macro generates a Rust `enum` that wraps a fixed set of types, providing automatic
+//! implementations for type conversions, method delegation, and trait delegation. This enables
+//! type-safe storage of different types without the runtime overhead of trait objects, ideal for
+//! scenarios requiring zero-cost abstractions for a known set of types at compile time.
 //!
-//! ## Example
+//! ## Why Use Enum Wrappers?
+//!
+//! In Rust, handling values of different types typically involves:
+//! - **Trait Objects**: Enable dynamic dispatch but incur runtime overhead and type erasure.
+//! - **Enum Wrappers**: Offer type safety and zero-cost abstractions for a fixed set of types,
+//!   as described in [The Rust Programming Language][book].
+//!
+//! The `nodyn!` macro simplifies creating enum wrappers by generating boilerplate for variant creation,
+//! type conversions, method/trait delegation, and introspection utilities.
+//!
+//! ## Key Features
+//!
+//! - **Automatic Variant Creation**: Generates an enum with variants for specified types.
+//! - **Type Conversion**: Implements [`From<T>`][std::convert::From] for each variant type and optionally
+//!   [`TryFrom<Enum> for T`][std::convert::TryFrom] for non-reference types (with `TryInto` feature).
+//! - **Method and Trait Delegation**: Delegates methods or entire traits to underlying types.
+//! - **Type Introspection**: Provides `count`, `types`, and `type_name` methods to query variant
+//!   information (with `introspection` feature).
+//! - **Custom Variant Names**: Allows overriding default variant names for clarity.
+//! - **Vec Wrapper**: Generates a `Vec<Enum>` wrapper with delegated [`std::vec::Vec`] methods and
+//!   and extra functionality to leverage the enums features.
+//!
+//! ## Basic Example
 //!
 //! ```rust
 //! nodyn::nodyn! {
@@ -33,31 +54,7 @@
 //! }
 //! ```
 //!
-//! ## Why Use Enum Wrappers?
-//!
-//! In Rust, when you need to handle values of different types, you have two
-//! primary options:
-//!
-//! - **Trait Objects**: Allow dynamic dispatch but incur runtime overhead and
-//!   type erasure.
-//! - **Enum Wrappers**: Provide type safety and zero-cost abstractions for a
-//!   fixed set of types known at compile time, as described in [The Rust Programming Language][book].
-//!
-//! The `nodyn::nodyn!` macro simplifies the creation of enum wrappers by
-//! generating boilerplate code for variant creation, type conversions,
-//! and method/trait delegation.
-//!
-//! ## Key Features
-//!
-//! - **Automatic Variant Creation**: Generates an enum with variants for each specified type.
-//! - **Type Conversion**: Implements `From<T>` for each variant type and `TryFrom<Enum> for T`
-//!   for non-reference types. (Available with the `from` and `try_into` features)
-//! - **Method and Trait Delegation**: Delegates methods or entire traits to the underlying types.
-//! - **Type Introspection**: Provides utility methods like `count()`, `types()`, and `ty()` to
-//!   query variant information. (available the `introspection` feature)
-//! - **Custom Variant Names**: Allows overriding default variant names for clarity.
-//!
-//! ## Example with Trait Delegation
+//! ## Trait Delegation Example
 //!
 //! Here's an example inspired by [Listing 10-13][listing-10-13] from [The Rust Programming Language][book], demonstrating trait delegation:
 //!
@@ -162,6 +159,7 @@
 //! ```ignore
 //! nodyn::nodyn! {
 //!     [ #[attribute] ]
+//!     [ #[module_path = "full::module::path"]]
 //!     [pub] enum EnumName [<'lifetime>] {
 //!         [VariantName(Type),]
 //!         [Type,]
@@ -176,173 +174,108 @@
 //!     [impl {
 //!         fn method_name(&self, args) -> ReturnType;
 //!     }]
+//!
+//!     [impl vec [VecWrapperName]]
+//!
+//!     [ #[vec_wrapper] | #[vec_wrapper(field)]
+//!       [ #[attribute] ]
+//!       [pub] struct CustomValues {
+//!           [field: Type,]
+//!       }
+//!     ]
 //! }
 //! ```
 //!
 //! - **Enum Definition**: Define the enum with optional visibility, derive attributes, and lifetimes.
 //! - **Variants**: Specify types directly (e.g., `i32`, `String`) or with custom variant names (e.g., `Int(i32)`).
-//! - **Optional methods & traits**: Include `impl <feature>` to enable optionsl traits like
-//!   `TryInto`
+//! - **Optional Traits & Methods** with `TryInto`, `is_as` and `introspection`
 //! - **Trait Delegation**: Include trait `impl` blocks to delegate trait methods to wrapped types.
 //! - **Method Delegation**: Include regular `impl` blocks to delegate custom methods.
+//! - **Vec Wrapper**: A `Vec` of your enum with methods and traits adapted to your enum.
+//! - **Custom Vec Wrappers**: Specify your own struct and nodyn will add a field for the vec and
+//!   the methods and traits to the struct.
 //!
-//! # Variant Types and Naming
+//! ## Generated Methods
 //!
-//! The macro supports various type categories and automatically generates variant names:
-//!
-//! ## Supported Types
-//!
-//! - **Path types**: `i32`, `String`, `Vec<T>`, `Option<T>`, etc.
-//! - **Reference types**: `&T`, `&mut T`, `&'a str`
-//! - **Array types**: `[T; N]`
-//! - **Tuple types**: `(T1, T2, ...)`
-//!
-//! ## Automatic Variant Naming
-//!
-//! ```rust
-//! nodyn::nodyn! {
-//!     #[derive(Debug)]
-//!     pub enum Example<'a> {
-//!         i32,           // → I32(i32)
-//!         String,        // → String(String)
-//!         (u8, u16),     // → U8U16((u8, u16))
-//!         [bool; 2],     // → BoolArray2([bool; 2])
-//!         &'a str,       // → StrRef(&'a str)
-//!     }
-//! }
-//! ```
-//!
-//! ## Custom Variant Names
-//!
-//! Override automatic names by specifying them explicitly:
-//!
-//! ```rust
-//! nodyn::nodyn! {
-//!     enum CustomNames {
-//!         Text(String),           // Custom name: Text
-//!         Numbers([i32; 3]),      // Custom name: Numbers
-//!         i32,                    // Auto name: I32
-//!     }
-//! }
-//! ```
-//!
-//! # Generated Methods
-//!
-//! ## Type Information Methods
-//!
-//! Available with the `introspection` feature.
+//! ### Type Information Methods (with `introspection`)
 //!
 //! ```rust
 //! nodyn::nodyn! {
 //!     enum Value { i32, String, f64 }
-//!
 //!     impl introspection;
 //! }
 //!
-//! // Number of variants
 //! assert_eq!(Value::count(), 3);
-//!
-//! // Array of type names
-//! assert_eq!(Value::types(), [ "i32", "String", "f64"]);
-//!
-//! // Get type name of current value
+//! assert_eq!(Value::types(), ["i32", "String", "f64"]);
 //! let val: Value = 42.into();
 //! assert_eq!(val.type_name(), "i32");
 //! ```
 //!
-//! ## Type Checking and Conversion Methods
-//!
-//! Available with the `is_as` feature.
-//!
-//! For each variant, the following methods are generated (using snake case names):
+//! ### Type Checking and Conversion Methods (with `is_as`)
 //!
 //! ```rust
 //! nodyn::nodyn! {
 //!     enum Container { String, Vec<u8> }
-//!
 //!     impl is_as;
 //! }
 //!
 //! let container: Container = "hello".to_string().into();
-//!
-//! // Type checking
 //! assert!(container.is_string());
 //! assert!(!container.is_vec_u8());
-//!
-//! // Value extraction (consumes self)
 //! if let Some(s) = container.try_as_string() {
 //!     println!("Got string: {}", s);
 //! }
-//!
-//! // Reference extraction (doesn't consume self)
 //! let container: Container = "hello".to_string().into();
 //! if let Some(s_ref) = container.try_as_string_ref() {
 //!     println!("String reference: {}", s_ref);
-//! }
-//!
-//! // Mutable reference extraction
-//! let mut container: Container = "hello".to_string().into();
-//! if let Some(s_mut) = container.try_as_string_mut() {
-//!     s_mut.push_str(" world");
 //! }
 //! ```
 //!
 //! Note: `*_ref()` and `*_mut()` methods are not generated for variants that wrap references.
 //!
-//! # Automatic Trait Implementations
+//! ## Automatic Trait Implementations
 //!
-//! ## From Trait
-//!
-//! Automatic `From<T>` implementations for all variant types:
+//! ### From Trait
 //!
 //! ```rust
 //! nodyn::nodyn! {
 //!     enum Value { i32, String }
 //! }
 //!
-//! let num: Value = 42.into();          // From<i32>
-//! let text: Value = "hello".to_string().into(); // From<String>
+//! let num: Value = 42.into();
+//! let text: Value = "hello".to_string().into();
 //! ```
 //!
-//! ## `TryFrom` Trait
-//!
-//! Automatic `TryFrom<Wrapper>` implementations for extracting original types:
-//!
-//! Available with the `TryInto` feature.
+//! ### `TryFrom` Trait (with `TryInto`)
 //!
 //! ```rust
-//! use std::convert::TryFrom;
-//!
 //! nodyn::nodyn! {
 //!     enum Value { i32, String }
-//!
 //!     impl TryInto;
 //! }
 //!
 //! let val: Value = 42.into();
 //! let num: i32 = i32::try_from(val).unwrap();
 //! assert_eq!(num, 42);
-//!
-//! let val: Value = "hello".to_string().into();
-//! let text: String = String::try_from(val).unwrap();
-//! assert_eq!(text, "hello");
 //! ```
+//!
+//! ### `#[into(T)]` Attribute
 //!
 //! **`#[into(T)]` Attribute**: Allows a variant to be converted into another
 //! type `T` if a `From` implementation and variant exists.
 //!
 //! ```rust
-//!   nodyn::nodyn! {
-//!       pub enum Foo {
-//!           i64,
-//!           #[into(i64)]
-//!           i32,
-//!       }
+//! nodyn::nodyn! {
+//!     pub enum Foo {
+//!         i64,
+//!         #[into(i64)]
+//!         i32,
+//!     }
+//!     impl TryInto;
+//! }
 //!
-//!       impl TryInto;
-//!   }
-//!   let foo: Foo = 42.into();
-//!   assert_eq!(i64::try_from(foo), Ok(42i64));
+//! let foo: Foo = 42.into();
+//! assert_eq!(i64::try_from(foo), Ok(42i64));
 //! ```
 //!
 //! # Method Delegation
@@ -395,97 +328,15 @@
 //! }
 //! ```
 //!
-//! # Advanced Example
+//! ## `Vec` Wrapper
 //!
-//! ```rust
-//! use std::fmt;
-//!
-//! #[derive(Debug, Clone)]
-//! pub struct Null;
-//!
-//! impl fmt::Display for Null {
-//!     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//!         write!(f, "null")
-//!     }
-//! }
-//!
-//! #[derive(Debug, Clone)]
-//! pub struct JsonArray(Vec<JsonValue>);
-//!
-//! impl fmt::Display for JsonArray {
-//!     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//!         let s = self
-//!             .0
-//!             .iter()
-//!             .map(ToString::to_string)
-//!             .collect::<Vec<_>>()
-//!             .join(", ");
-//!         write!(f, "[{s}]")
-//!     }
-//! }
-//!
-//! nodyn::nodyn! {
-//!     #[derive(Debug, Clone)]
-//!     pub enum JsonValue {
-//!         Null,
-//!         bool,
-//!         f64,
-//!         String,
-//!         JsonArray,
-//!     }
-//!
-//!     impl fmt::Display {
-//!         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
-//!     }
-//!
-//!     impl {
-//!         pub const fn json_type_name(&self) -> &'static str {
-//!             match self {
-//!                 Self::Null(_) => "null",
-//!                 Self::Bool(_) => "boolean",
-//!                 Self::F64(_) => "number",
-//!                 Self::String(_) => "string",
-//!                 Self::JsonArray(_) => "array",
-//!             }
-//!         }
-//!     }
-//! }
-//!
-//! let values: Vec<JsonValue> = vec![
-//!     Null.into(),                // null
-//!     true.into(),                // boolean
-//!     42.0.into(),                // number
-//!     "hello".to_string().into(), // string
-//!     JsonArray(vec![
-//!         Null.into(),
-//!         false.into(),
-//!         33.0.into(),
-//!         "world".to_string().into(),
-//!     ]) .into(),
-//! ];
-//!
-//! for val in &values {
-//!     println!("{}: {}", val.json_type_name(), val);
-//! }
-//!
-//! // null: null
-//! // boolean: true
-//! // number: 42
-//! // string: hello
-//! // array: [null, false, 33, world]
-//! ```
-//!
-//! # `Vec` wrapper
-//!
-//! Nodyn can generate a wrapper around a `Vec` for your `enum`.
-//! It implements many of the [`std::vec::Vec`] methods and changes
-//! some methods to leverage nodyns features. For example `push`
-//! works with `Into` so if you can push any value your enum wraps
-//! directly to your vec.
+//! The `vec` feature generates a wrapper around a [`std::vec::Vec<Enum>`][std::vec::Vec], implementing
+//! many `Vec` methods and variant-specific accessors (e.g., `first_number` for an `i32` variant).
+//! Methods like `push` and `insert` leverage `Into<Enum>`, allowing direct insertion of wrapped types.
 //!
 //! ### Example
 //!
-//! ```
+//! ```rust
 //! nodyn::nodyn! {
 //!     #[derive(Debug, Clone)]
 //!     pub enum Value {
@@ -493,19 +344,34 @@
 //!         String,
 //!         f64,
 //!     }
-//!
-//!     impl vec; // creates a vec wrapper `ValueVec`
-//!               // with `Debug`, `Clone` + `Default` derived.
+//!     impl vec;
 //! }
 //!
-//!
-//!
 //! let mut values = ValueVec::default();
-//! values.push(42);                  // push a Value::I32
-//! values.push("hello".to_string()); // push a Value::String
+//! values.push(42);
+//! values.push("hello".to_string());
+//! assert_eq!(values.first_i32(), Some(&42));
+//! assert_eq!(values.len(), 2);
 //! ```
 //!
-//! ## A `vec!` like macro
+//! ### Simple Wrappers
+//!
+//! Using `impl vec` generates a wrapper named `<EnumName>Vec` with the same derive attributes as
+//! the enum, plus `Default`. You can specify a custom name:
+//!
+//! ```rust
+//! nodyn::nodyn! {
+//!     #[derive(Debug, PartialEq, Clone)]
+//!     pub enum Value {
+//!         i32,
+//!         String,
+//!         f64,
+//!     }
+//!     impl vec Values;
+//! }
+//! ```
+//!
+//! ### A `vec!` like macro
 //!
 //! Nodyn generates a macro for your vec wrapper with the name
 //! of the wrapper changed to snake case. As the `nodyn!` macro
@@ -517,7 +383,7 @@
 //! The macro works like `vec!` but accepts any value within your
 //! enum.
 //!
-//! ### Example
+//! #### Example
 //!
 //! ```ignore
 //! // in src/my/awsome/foo.rs:
@@ -535,75 +401,272 @@
 //!
 //! // elsewhere after importing values, etc:
 //! let my_values = values!["hello", 42, "world", 0.1];
-//! ````
-//!
-//! ## Simple wrappers
-//!
-//! If you add `impl vec` nodyn will generate a Vec wrapper
-//! named using the enums name with 'Vec' appended and it
-//! will have the same `derive` attributes added as the enum
-//! has. The `Default` trait is always derived. You can add a
-//! name if you don't like the generated one.
-//!
-//! ### Example
-//!
 //! ```
+//!
+//! ### Custom Wrappers
+//!
+//! Define a custom wrapper struct with additional fields using the
+//! `#[vec_wrapper]` or `#[vec_wrapper(field_name)]` attribute. Without
+//! a field name 'inner' is used. `nodyn!` adds the field. Unlike the
+//! standard vec wrapper, derive arguments are not copied from the enum.
+//! `nodyn!` does implement neither `Deref` nor `DerefMut`, so you can!
+//!
+//! ```rust
 //! nodyn::nodyn! {
-//!     #[derive(Debug, PartialEq, Clone)]
+//!     #[derive(Debug, Clone)]
 //!     pub enum Value {
 //!         i32,
 //!         String,
-//!         f64,
 //!     }
 //!
-//!     impl vec Values; // creates a vec wrapper `Values`.
+//!     #[vec_wrapper(inner_vec)]
+//!     #[derive(Debug, Clone)]
+//!     pub struct CustomValues {
+//!         metadata: String,
+//!     }
 //! }
+//!
+//! let mut values = CustomValues {
+//!     metadata: "example".to_string(),
+//!     inner_vec: vec![],
+//! };
+//! values.push(42);
+//! assert_eq!(values.metadata, "example");
 //! ```
 //!
-//! ## Traits and generated methods.
+//! ### implemented methods and traits
 //!
-//! The traits that the wrapper has **using the derive macro**, affects
-//! which methods are generated.
+//! the `vec` wrapper implements many [`std::vec::vec`] methods and traits, with some modified to
+//! leverage `nodyn` features. the following table summarizes them:
 //!
-//! - **`Default`**: The constructors `new` and `with_capacity`
+//! | method | required traits | differences from [`std::vec::vec`] |
+//! |--------|-----------------|------------------------------------|
+//! | [`new`][std::vec::vec::new] | `default` | initializes other fields with `default::default()`. |
+//! | [`with_capacity`][std::vec::vec::with_capacity] | `default` | initializes other fields with `default::default()`. |
+//! | [`split_off`][std::vec::vec::split_off] | `default` | initializes other fields with `default::default()`. |
+//! | [`dedup`][std::vec::vec::dedup] | `partialeq` | none; direct delegation. |
+//! | [`resize`][std::vec::vec::resize] | `clone` | accepts `into<enum>`. |
+//! | [`extend_from_within`][std::vec::vec::extend_from_within] | `clone` | none; direct delegation. |
+//! | [`extend_from_slice`][std::vec::vec::extend_from_slice] | `clone` | none; direct delegation. |
+//! | [`insert`][std::vec::vec::insert] | none | accepts `into<enum>`. |
+//! | [`push`][std::vec::vec::push] | none | accepts `into<enum>`. |
+//! | [`capacity`][std::vec::vec::capacity] | none | none; direct delegation. |
+//! | [`reserve`][std::vec::vec::reserve] | none | none; direct delegation. |
+//! | [`reserve_exact`][std::vec::vec::reserve_exact] | none | none; direct delegation. |
+//! | [`try_reserve`][std::vec::vec::try_reserve] | none | none; direct delegation. |
+//! | [`try_reserve_exact`][std::vec::vec::try_reserve_exact] | none | none; direct delegation. |
+//! | [`shrink_to_fit`][std::vec::vec::shrink_to_fit] | none | none; direct delegation. |
+//! | [`shrink_to`][std::vec::vec::shrink_to] | none | none; direct delegation. |
+//! | [`into_boxed_slice`][std::vec::vec::into_boxed_slice] | none | none; direct delegation. |
+//! | [`truncate`][std::vec::vec::truncate] | none | none; direct delegation. |
+//! | [`as_slice`][std::vec::vec::as_slice] | none | none; direct delegation. |
+//! | [`as_mut_slice`][std::vec::vec::as_mut_slice] | none | none; direct delegation. |
+//! | [`swap_remove`][std::vec::vec::swap_remove] | none | none; direct delegation. |
+//! | [`remove`][std::vec::vec::remove] | none | none; direct delegation. |
+//! | [`retain`][std::vec::vec::retain] | none | none; direct delegation. |
+//! | [`retain_mut`][std::vec::vec::retain_mut] | none | none; direct delegation. |
+//! | [`dedup_by_key`][std::vec::vec::dedup_by_key] | none | none; direct delegation. |
+//! | [`dedup_by`][std::vec::vec::dedup_by] | none | none; direct delegation. |
+//! | [`pop`][std::vec::vec::pop] | none | none; direct delegation. |
+//! | [`pop_if`][std::vec::vec::pop_if] | none | none; direct delegation. |
+//! | [`append`][std::vec::vec::append] | none | none; direct delegation. |
+//! | [`splice`][std::vec::vec::splice] | none | none; direct delegation. |
+//! | [`extract_if`][std::vec::vec::extract_if] | none | none; direct delegation. |
+//! | [`first`][std::vec::vec::first] | none | none; direct delegation. |
+//! | [`first_mut`][std::vec::vec::first_mut] | none | none; direct delegation. |
+//! | [`last`][std::vec::vec::last] | none | none; direct delegation. |
+//! | [`last_mut`][std::vec::vec::last_mut] | none | none; direct delegation. |
+//! | [`split_first`][std::vec::vec::split_first] | none | none; direct delegation. |
+//! | [`split_first_mut`][std::vec::vec::split_first_mut] | none | none; direct delegation. |
+//! | [`split_last`][std::vec::vec::split_last] | none | none; direct delegation. |
+//! | [`split_last_mut`][std::vec::vec::split_last_mut] | none | none; direct delegation. |
+//! | [`get`][std::vec::vec::get] | none | none; direct delegation. |
+//! | [`get_mut`][std::vec::vec::get_mut] | none | none; direct delegation. |
+//! | [`swap`][std::vec::vec::swap] | none | none; direct delegation. |
+//! | [`reverse`][std::vec::vec::reverse] | none | none; direct delegation. |
+//! | [`iter`][std::vec::vec::iter] | none | none; direct delegation. |
+//! | [`iter_mut`][std::vec::vec::iter_mut] | none | none; direct delegation. |
 //!
-//! ## Implemented traits
+//! | trait | required traits | differences from [`std::vec::vec`] |
+//! |-------|-----------------|------------------------------------|
+//! | [`from<self>`][std::convert::from] | none | converts to `vec<enum>`. |
+//! | [`index`][std::ops::index] | none | delegates to `vec::index`. |
+//! | [`indexmut`][std::ops::indexmut] | none | delegates to `vec::index_mut`. |
+//! | [`intoiterator`][std::iter::intoiterator] | none | implements for `&self`, `&mut self`, and `self`. |
+//! | [`asref<self>`][std::convert::asref] | none | returns `&self`. |
+//! | [`asmut<self>`][std::convert::asmut] | none | returns `&mut self`. |
+//! | [`asref<vec<enum>>`][std::convert::asref] | none | delegates to `vec`. |
+//! | [`asmut<vec<enum>>`][std::convert::asmut] | none | delegates to `vec`. |
+//! | [`asref<[enum]>`][std::convert::asref] | none | delegates to `vec`. |
+//! | [`asmut<[enum]>`][std::convert::asmut] | none | delegates to `vec`. |
+//! | [`from<vec<enum>>`][std::convert::from] | `default` | initializes other fields with `default::default()`. |
+//! | [`fromiterator<enum>`][std::iter::fromiterator] | `default` | initializes other fields with `default::default()`. |
+//! | [`from<&[enum]>`][std::convert::from] | `clone`, `default` | initializes other fields with `default::default()`. |
+//! | [`from<&mut [enum]>`][std::convert::from] | `clone`, `default` | initializes other fields with `default::default()`. |
+//! | [`extend<enum>`][std::iter::extend] | `clone` | delegates to `vec::extend`. |
 //!
-//! - Indexing via [`std::ops::Index`] and [`std::ops::IndexMut`]
-//! - Iteration: all tree forms of [`std::iter::IntoIterator`]
+//! ## Feature Flags
 //!
-//! ## Custom wrapper
+//! ### Using `impl` (Recommended)
 //!
-//! If you want more control over the wrapper you can specify
-//! your own wrapper struct:
+//! Specify features within the macro using `impl TryInto`, `impl is_as`, `impl introspection`, or `impl vec`.
+//! These are disabled by default, allowing explicit control.
+//!
+//! ### Using Cargo Features (Deprecated)
+//!
+//! If no `impl` features are specified, the macro falls back to Cargo feature flags for backward compatibility.
+//! All Cargo features are enabled by default.
+//!
+//! | Cargo Feature | `impl` Equivalent | Enables |
+//! |---------------|-------------------|---------|
+//! | `from` | None | From 0.2.0 no longer optional |
+//! | `try_into` | `TryInto` | Automatic `TryFrom` trait implementation |
+//! | `introspection` | `introspection` | Type introspection methods (`count`, `types`, `type_name`) |
+//! | `is_as` | `is_as` | Variant test and accessor methods (`is_*`, `try_as_*`) |
+//!
+//! To transition from Cargo features, replace feature flags in `Cargo.toml` with `impl` directives in the macro.
+//!
+//! # Advanced Example
 //!
 //!
+//! ```rust
+//! use std::fmt;
 //!
-//! ## Generated `Vec` methods
+//! nodyn::nodyn! {
+//!     #[derive(Debug, Clone)]
+//!     pub enum JsonValue {
+//!         Null,
+//!         bool,
+//!         f64,
+//!         String,
+//!         JsonArray,
+//!     }
+//!     impl vec;
+//!     impl fmt::Display {
+//!         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
+//!     }
+//!     impl {
+//!         pub const fn json_type_name(&self) -> &'static str {
+//!             match self {
+//!                 Self::Null(_) => "null",
+//!                 Self::Bool(_) => "boolean",
+//!                 Self::F64(_) => "number",
+//!                 Self::String(_) => "string",
+//!                 Self::JsonArray(_) => "array",
+//!             }
+//!         }
+//!     }
+//! }
 //!
-//! - [`fn new() -> Self`](Vec::new()) (needs `Default`)
-//! - [`fn with_capacity() -> Self`](Vec::with_capacity()) (needs `Default`)
+//! #[derive(Debug, Clone)]
+//! pub struct Null;
 //!
-//! # Optional features
+//! impl fmt::Display for Null {
+//!     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//!         write!(f, "null")
+//!     }
+//! }
 //!
-//! These used to be selected using a cargo feature flags, this
-//! way is depreciated. Change to enabling features using `impl`
-//! in the macro.
+//! #[derive(Debug, Clone)]
+//! pub struct JsonArray(JsonValueVec);
 //!
-//! All cargo features are enabled by default, but features using
-//! impl are all disabled by default so you have to start adding
-//! the features you want. As a transition if you don't specify
-//! any features using impl, cargo feature flags will be used.
+//! impl fmt::Display for JsonArray {
+//!     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//!         let s = self.0.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ");
+//!         write!(f, "[{s}]")
+//!     }
+//! }
 //!
-//! The name of the `try_into` feature has changed to `TryInto`
-//! when selectef using impl.
 //!
-//! | cargo (depreciated) | impl |  |
-//! |-------|-------|----------|
-//! | `from`          |  | since 0.2.0 no longer used. `From` is no longer optional|
-//! | `try_into`      | `TryInto` | automatic TryFrom trait implementation |
-//! | `introspection` | `introspection` | generation of type introspection functions |
-//! | `is_as`         | `is_as` | generation of variant test and accessor functions |
+//! let mut values = JsonValueVec::default();
+//! values.push(Null);
+//! values.push(true);
+//! values.push(42.0);
+//! values.push("hello".to_string());
+//! values.push(JsonArray(json_value_vec![Null, false, 33.0]));
+//!
+//! for val in &values {
+//!     println!("{}: {}", val.json_type_name(), val);
+//! }
+//! ```
+// //! ```rust
+// //! use std::fmt;
+// //!
+// //! #[derive(Debug, Clone)]
+// //! pub struct Null;
+// //!
+// //! impl fmt::Display for Null {
+// //!     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+// //!         write!(f, "null")
+// //!     }
+// //! }
+// //!
+// //! #[derive(Debug, Clone)]
+// //! pub struct JsonArray(Vec<JsonValue>);
+// //!
+// //! impl fmt::Display for JsonArray {
+// //!     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+// //!         let s = self
+// //!             .0
+// //!             .iter()
+// //!             .map(ToString::to_string)
+// //!             .collect::<Vec<_>>()
+// //!             .join(", ");
+// //!         write!(f, "[{s}]")
+// //!     }
+// //! }
+// //!
+// //! nodyn::nodyn! {
+// //!     #[derive(Debug, Clone)]
+// //!     pub enum JsonValue {
+// //!         Null,
+// //!         bool,
+// //!         f64,
+// //!         String,
+// //!         JsonArray,
+// //!     }
+// //!
+// //!     impl fmt::Display {
+// //!         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
+// //!     }
+// //!
+// //!     impl {
+// //!         pub const fn json_type_name(&self) -> &'static str {
+// //!             match self {
+// //!                 Self::Null(_) => "null",
+// //!                 Self::Bool(_) => "boolean",
+// //!                 Self::F64(_) => "number",
+// //!                 Self::String(_) => "string",
+// //!                 Self::JsonArray(_) => "array",
+// //!             }
+// //!         }
+// //!     }
+// //! }
+// //!
+// //! let values: Vec<JsonValue> = vec![
+// //!     Null.into(),                // null
+// //!     true.into(),                // boolean
+// //!     42.0.into(),                // number
+// //!     "hello".to_string().into(), // string
+// //!     JsonArray(vec![
+// //!         Null.into(),
+// //!         false.into(),
+// //!         33.0.into(),
+// //!         "world".to_string().into(),
+// //!     ]) .into(),
+// //! ];
+// //!
+// //! for val in &values {
+// //!     println!("{}: {}", val.json_type_name(), val);
+// //! }
+// //!
+// //! // null: null
+// //! // boolean: true
+// //! // number: 42
+// //! // string: hello
+// //! // array: [null, false, 33, world]
+// //! ```
+//
 
 use proc_macro::TokenStream;
 use quote::quote;

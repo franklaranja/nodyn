@@ -1,15 +1,15 @@
 use core::option::Option::None;
 use proc_macro2::{Ident, Span, TokenStream, TokenTree};
-use quote::{ToTokens, quote};
+use quote::{quote, ToTokens};
 use syn::spanned::Spanned;
 use syn::{
-    Attribute, Fields, GenericParam, Generics, ItemStruct, Meta, Token, Visibility, WherePredicate,
     parse::{Parse, ParseStream, Parser},
     parse_quote,
     punctuated::Punctuated,
+    Attribute, Fields, GenericParam, Generics, ItemStruct, Meta, Token, Visibility, WherePredicate,
 };
 
-use crate::{GenericsExt, NodynEnum, camel_to_snake};
+use crate::{camel_to_snake, GenericsExt, NodynEnum};
 
 /// Represents a wrapper struct for a collection of enum variants in the `nodyn` crate.
 /// Currently only `Vec` wrappers are supported.
@@ -538,6 +538,12 @@ impl VecWrapper {
             /// See [`std::vec::Vec::iter_mut`].
             #visibility fn iter_mut(&mut self) -> ::core::slice::IterMut<'_, #enum_ident #enum_generics> {
                 self.#field.iter_mut()
+            }
+
+            // new
+
+            #visibility fn len(&mut self) -> usize {
+                self.#field.len()
             }
         }
     }

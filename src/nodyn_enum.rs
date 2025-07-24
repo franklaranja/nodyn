@@ -2,16 +2,16 @@ use core::option::Option::None; // for analyzer
 use std::collections::HashSet;
 
 use proc_macro2::TokenStream;
-use quote::{ToTokens, format_ident, quote};
+use quote::{format_ident, quote, ToTokens};
 use syn::{
-    Attribute, Expr, FnArg, GenericParam, Generics, Ident, Meta, Path, Token, Type, Visibility,
-    WherePredicate,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     spanned::Spanned,
+    Attribute, FnArg, GenericParam, Generics, Ident, Meta, Path, Token, Type, Visibility,
+    WherePredicate,
 };
 
-use crate::{MethodImpl, OptionalImpl, TraitImpl, Variant, VecWrapper, keyword};
+use crate::{keyword, MethodImpl, OptionalImpl, TraitImpl, Variant, VecWrapper};
 
 // mod kw {
 //     syn::custom_keyword!(from);
@@ -39,7 +39,7 @@ pub(crate) struct NodynEnum {
     pub(crate) optional_impl: OptionalImpl,
     /// Wrapper structs for collections (e.g., `Vec`-based structs).
     pub(crate) vec_wrappers: Vec<VecWrapper>,
-    /// module path to where the macro is invoked used for vec_wrapper macro
+    /// module path to where the macro is invoked, used for vec wrapper macro
     pub(crate) module_path: Option<Path>,
 }
 
@@ -627,12 +627,10 @@ mod tests {
             ",
         );
         assert!(result.is_err());
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("Duplicate variant type")
-        );
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Duplicate variant type"));
     }
 
     #[test]
