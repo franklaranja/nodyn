@@ -10,7 +10,7 @@ use syn::{
     Attribute, FnArg, GenericParam, Generics, Ident, Meta, Token, Type, Visibility, WherePredicate,
 };
 
-use crate::{keyword, Features, MethodImpl, TraitImpl, Variant, VecWrapper};
+use crate::{keyword, MethodImpl, OptionalImpl, TraitImpl, Variant, VecWrapper};
 
 // mod kw {
 //     syn::custom_keyword!(from);
@@ -35,7 +35,7 @@ pub(crate) struct NodynEnum {
     /// Trait implementations for the enum.
     pub(crate) trait_impls: Vec<TraitImpl>,
     /// Enabled features (`TryInto`, `is_as`, `introspection`).
-    pub(crate) features: Features,
+    pub(crate) optional_impl: OptionalImpl,
     /// Wrapper structs for collections (e.g., `Vec`-based structs).
     pub(crate) vec_wrappers: Vec<VecWrapper>,
 }
@@ -68,7 +68,7 @@ impl Parse for NodynEnum {
         let derive_attrs = Self::extract_derive_attrs(&attrs);
         let mut impl_blocks = Vec::new();
         let mut trait_blocks = Vec::new();
-        let mut features = Features::default();
+        let mut features = OptionalImpl::default();
         let mut collection_structs = Vec::new();
 
         // Parse additional impl blocks and wrapper structs
@@ -92,12 +92,11 @@ impl Parse for NodynEnum {
                     if input.peek(Token![;]) {
                         input.parse::<syn::token::Semi>()?;
                     }
-                } else if input.peek(keyword::From)
-                    || input.peek(keyword::TryInto)
+                } else if input.peek(keyword::TryInto)
                     || input.peek(keyword::is_as)
                     || input.peek(keyword::introspection)
                 {
-                    features.merge(input.parse::<Features>()?);
+                    features.merge(input.parse::<OptionalImpl>()?);
                 } else if input.peek(Ident) {
                     trait_blocks.push(input.parse::<TraitImpl>()?);
                 } else {
@@ -122,7 +121,7 @@ impl Parse for NodynEnum {
             variants,
             method_impls: impl_blocks,
             trait_impls: trait_blocks,
-            features,
+            optional_impl: features,
             vec_wrappers: collection_structs,
         })
     }
@@ -494,58 +493,66 @@ impl NodynEnum {
         quote! { #(#methods)* }
     }
 
-    pub(crate) fn generate_features(&self) -> TokenStream {
-        if self.features.none() {
-            // depreciated feature flags only if no features are set
+    /// returns a `TokenStream` that is always included
+    pub(crate) fn to_standard_impl(&self) -> TokenStream {
+        let from = self.to_from_impls();
+        quote! {
+            #(#from)*
+        }
+    }
 
-            #[cfg(feature = "from")]
-            let from = self.to_from_impls();
-            #[cfg(not(feature = "from"))]
-            let from = Vec::<proc_macro2::TokenStream>::new();
+    pub(crate) fn to_optional_impl(&self) -> TokenStream {
+        if self.optional_impl.none() {
+            // depreciated feature flags only if no features are set
             #[cfg(feature = "try_into")]
+            #[deprecated(
+                since = "0.2.0",
+                note = "Use `impl TryInto` in the macro invocation instead, as this feature is outdated and will be removed in version 0.3.0"
+            )]
             let try_into = self.to_try_from_impls();
             #[cfg(not(feature = "try_into"))]
             let try_into = Vec::<proc_macro2::TokenStream>::new();
 
             #[cfg(feature = "introspection")]
+            #[deprecated(
+                since = "0.2.0",
+                note = "Use `impl introspection` in the macro invocation instead, as this feature is outdated and will be removed in version 0.3.0"
+            )]
             let type_fns = self.to_introspection_methods();
             #[cfg(not(feature = "introspection"))]
             let type_fns = proc_macro2::TokenStream::new();
+
             #[cfg(feature = "is_as")]
+            #[deprecated(
+                since = "0.2.0",
+                note = "Use `impl is_as` in the macro invocation instead, as this feature is outdated and will be removed in version 0.3.0"
+            )]
             let is_as_fn = self.to_is_as_methods().unwrap();
             #[cfg(not(feature = "is_as"))]
             let is_as_fn = proc_macro2::TokenStream::new();
 
             quote! {
-                #(#from)*
                 #(#try_into)*
                 #type_fns
                 #is_as_fn
             }
         } else {
-            let from = if self.features.from {
-                self.to_from_impls()
-            } else {
-                Vec::new()
-            };
-
-            let try_into = if self.features.try_into {
+            let try_into = if self.optional_impl.try_into {
                 self.to_try_from_impls()
             } else {
                 Vec::new()
             };
-            let type_fns = if self.features.introspection {
+            let type_fns = if self.optional_impl.introspection {
                 self.to_introspection_methods()
             } else {
                 proc_macro2::TokenStream::new()
             };
-            let is_as_fn = if self.features.is_as {
+            let is_as_fn = if self.optional_impl.is_as {
                 self.to_is_as_methods().unwrap()
             } else {
                 proc_macro2::TokenStream::new()
             };
             quote! {
-                #(#from)*
                 #(#try_into)*
                 #type_fns
                 #is_as_fn
@@ -627,15 +634,13 @@ mod tests {
             pub enum MyEnum {
                 Number(i32),
             }
-            impl From;
             impl TryInto;
             ",
         )
         .unwrap();
 
-        assert!(input.features.from);
-        assert!(input.features.try_into);
-        assert!(!input.features.is_as);
-        assert!(!input.features.introspection);
+        assert!(input.optional_impl.try_into);
+        assert!(!input.optional_impl.is_as);
+        assert!(!input.optional_impl.introspection);
     }
 }

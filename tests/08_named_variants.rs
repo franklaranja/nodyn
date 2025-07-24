@@ -8,8 +8,6 @@ nodyn::nodyn! {
         Bax(Xee<'b>),
   }
 
-  impl From
-
   impl {
         #[must_use]
         pub const fn foo(&self) -> &'static str {

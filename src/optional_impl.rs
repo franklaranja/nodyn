@@ -2,20 +2,16 @@ use syn::{parse::Parse, Token};
 
 use crate::keyword;
 
-#[allow(clippy::struct_excessive_bools)]
+// #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Copy, Clone, Default)]
-pub(crate) struct Features {
-    pub(crate) from: bool,
+pub(crate) struct OptionalImpl {
     pub(crate) try_into: bool,
     pub(crate) is_as: bool,
     pub(crate) introspection: bool,
 }
 
-impl Features {
+impl OptionalImpl {
     pub(crate) const fn merge(&mut self, other: Self) {
-        if other.from {
-            self.from = true;
-        }
         if other.try_into {
             self.try_into = true;
         }
@@ -28,26 +24,23 @@ impl Features {
     }
 
     pub(crate) const fn none(self) -> bool {
-        !self.from && !self.try_into && !self.is_as && !self.introspection
+        !self.try_into && !self.is_as && !self.introspection
     }
 }
 
-impl Parse for Features {
+impl Parse for OptionalImpl {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let mut features = Self::default();
+        let mut optional = Self::default();
         loop {
-            if input.peek(keyword::From) {
-                let _ = input.parse::<keyword::From>()?;
-                features.from = true;
-            } else if input.peek(keyword::TryInto) {
+            if input.peek(keyword::TryInto) {
                 let _ = input.parse::<keyword::TryInto>()?;
-                features.try_into = true;
+                optional.try_into = true;
             } else if input.peek(keyword::is_as) {
                 let _ = input.parse::<keyword::is_as>()?;
-                features.is_as = true;
+                optional.is_as = true;
             } else if input.peek(keyword::introspection) {
                 let _ = input.parse::<keyword::introspection>()?;
-                features.introspection = true;
+                optional.introspection = true;
             } else {
                 break;
             }
@@ -55,6 +48,6 @@ impl Parse for Features {
         if input.peek(Token![;]) {
             let _ = input.parse::<syn::token::Semi>()?;
         }
-        Ok(features)
+        Ok(optional)
     }
 }

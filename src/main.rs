@@ -6,8 +6,6 @@ nodyn::nodyn! {
     f64,
   }
 
-    impl From;
-
   impl vec;
 
   impl vec Bar;

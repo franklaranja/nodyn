@@ -12,10 +12,7 @@ nodyn::nodyn! {
     [u8;4],
   }
 
-  impl From
-
   impl TryInto
-
 }
 
 fn main() {

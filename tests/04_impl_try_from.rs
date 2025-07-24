@@ -8,8 +8,7 @@ nodyn::nodyn! {
         u32,
         [u8;4],
     }
-
-    impl From TryInto
+    impl TryInto;
 }
 
 fn main() {

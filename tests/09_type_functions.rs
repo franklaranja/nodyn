@@ -10,7 +10,7 @@ nodyn::nodyn! {
     [u8;4],
   }
 
-  impl From introspection
+  impl introspection
 }
 
 fn main() {

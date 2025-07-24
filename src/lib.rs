@@ -16,8 +16,6 @@
 //!         String,
 //!         f64,
 //!     }
-//!
-//!     impl From;
 //! }
 //!
 //! let values: Vec<Value> = vec![
@@ -145,8 +143,6 @@
 //!         &'a str,                // StrRef
 //!         Vec<String>,            // VecString
 //!     }
-//!
-//!     impl From;
 //! }
 //!
 //! let values = vec![
@@ -171,7 +167,7 @@
 //!         [Type,]
 //!     }
 //!
-//!     [impl From | TryInto | is_as | introspection]
+//!     [impl TryInto | is_as | introspection]
 //!
 //!     [impl TraitName {
 //!         fn method_name(&self, args) -> ReturnType;
@@ -185,7 +181,8 @@
 //!
 //! - **Enum Definition**: Define the enum with optional visibility, derive attributes, and lifetimes.
 //! - **Variants**: Specify types directly (e.g., `i32`, `String`) or with custom variant names (e.g., `Int(i32)`).
-//! - **Features**: Specify included festures
+//! - **Optional methods & traits**: Include `impl <feature>` to enable optionsl traits like
+//!   `TryInto`
 //! - **Trait Delegation**: Include trait `impl` blocks to delegate trait methods to wrapped types.
 //! - **Method Delegation**: Include regular `impl` blocks to delegate custom methods.
 //!
@@ -239,7 +236,7 @@
 //! nodyn::nodyn! {
 //!     enum Value { i32, String, f64 }
 //!
-//!     impl introspection From;
+//!     impl introspection;
 //! }
 //!
 //! // Number of variants
@@ -263,7 +260,7 @@
 //! nodyn::nodyn! {
 //!     enum Container { String, Vec<u8> }
 //!
-//!     impl is_as From;
+//!     impl is_as;
 //! }
 //!
 //! let container: Container = "hello".to_string().into();
@@ -298,13 +295,9 @@
 //!
 //! Automatic `From<T>` implementations for all variant types:
 //!
-//! Available with the `From` feature.
-//!
 //! ```rust
 //! nodyn::nodyn! {
 //!     enum Value { i32, String }
-//!
-//!     impl From;
 //! }
 //!
 //! let num: Value = 42.into();          // From<i32>
@@ -323,7 +316,7 @@
 //! nodyn::nodyn! {
 //!     enum Value { i32, String }
 //!
-//!     impl From TryInto;
+//!     impl TryInto;
 //! }
 //!
 //! let val: Value = 42.into();
@@ -346,7 +339,7 @@
 //!           i32,
 //!       }
 //!
-//!       impl From TryInto;
+//!       impl TryInto;
 //!   }
 //!   let foo: Foo = 42.into();
 //!   assert_eq!(i64::try_from(foo), Ok(42i64));
@@ -360,8 +353,6 @@
 //! ```rust
 //! nodyn::nodyn! {
 //!     enum Container { String, Vec<u8> }
-//!
-//!     impl From;
 //!
 //!     impl {
 //!         // Delegate methods that exist on all types
@@ -387,8 +378,6 @@
 //! // All wrapped types implement Display
 //! nodyn::nodyn! {
 //!     enum Displayable { i32, String, f64 }
-//!
-//!     impl From;
 //!
 //!     impl Display {
 //!         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
@@ -445,8 +434,6 @@
 //!         JsonArray,
 //!     }
 //!
-//!     impl From;
-//!
 //!     impl fmt::Display {
 //!         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
 //!     }
@@ -493,8 +480,8 @@
 //! Nodyn can generate a wrapper around a `Vec` for your `enum`.
 //! It implements many of the [`std::vec::Vec`] methods and changes
 //! some methods to leverage nodyns features. For example `push`
-//! works with `Into` so if you add `impl From` to your enum you
-//! can push any value your enum wraps directly in your vec.
+//! works with `Into` so if you can push any value your enum wraps
+//! directly to your vec.
 //!
 //! ### Example
 //!
@@ -506,8 +493,6 @@
 //!         String,
 //!         f64,
 //!     }
-//!
-//!     impl From;
 //!
 //!     impl vec; // creates a vec wrapper `ValueVec`
 //!               // with `Debug`, `Clone` + `Default` derived.
@@ -539,8 +524,6 @@
 //!         f64,
 //!     }
 //!
-//!     impl From;
-//!
 //!     impl vec Values; // creates a vec wrapper `Values`.
 //! }
 //! ```
@@ -569,9 +552,9 @@
 //! - [`fn new() -> Self`](Vec::new()) (needs `Default`)
 //! - [`fn with_capacity() -> Self`](Vec::with_capacity()) (needs `Default`)
 //!
-//! # Features
+//! # Optional features
 //!
-//! These used to be generated using a cargo feature flags, this
+//! These used to be selected using a cargo feature flags, this
 //! way is depreciated. Change to enabling features using `impl`
 //! in the macro.
 //!
@@ -580,29 +563,30 @@
 //! the features you want. As a transition if you don't specify
 //! any features using impl, cargo feature flags will be used.
 //!
-//! The names of `from` and `try_into` features have changed for
-//! `impl`: use CamelCase.
+//! The name of the `try_into` feature has changed to `TryInto`
+//! when selectef using impl.
 //!
-//! | cargo (depreciated) | impl | enables |
+//! | cargo (depreciated) | impl |  |
 //! |-------|-------|----------|
-//! | `from`          | `From` | automatic From trait implementation |
+//! | `from`          |  | since 0.2.0 no longer used. `From` is no longer optional|
 //! | `try_into`      | `TryInto` | automatic TryFrom trait implementation |
 //! | `introspection` | `introspection` | generation of type introspection functions |
-//! | `is_as`         | `is_ad` | generation of variant test and accessor functions |
+//! | `is_as`         | `is_as` | generation of variant test and accessor functions |
+
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse_macro_input;
 
-mod feature;
 mod method_impl;
 mod nodyn_enum;
+mod optional_impl;
 mod trait_impl;
 mod variant;
 mod vec_wrapper;
 
-pub(crate) use feature::Features;
 pub(crate) use method_impl::MethodImpl;
 pub(crate) use nodyn_enum::NodynEnum;
+pub(crate) use optional_impl::OptionalImpl;
 pub(crate) use trait_impl::TraitImpl;
 pub(crate) use variant::{camel_to_snake, Variant};
 pub(crate) use vec_wrapper::VecWrapper;
@@ -614,7 +598,8 @@ pub fn nodyn(input: TokenStream) -> TokenStream {
     let nodyn_enum = parse_macro_input!(input as NodynEnum);
 
     let e_num = nodyn_enum.to_enum_definition();
-    let features = nodyn_enum.generate_features();
+    let standard_impl = nodyn_enum.to_standard_impl();
+    let optional_impl = nodyn_enum.to_optional_impl();
     let method_impls = nodyn_enum.to_method_impls();
     let trait_impls = nodyn_enum.to_trait_impls();
     let vec_wrappers = nodyn_enum
@@ -625,7 +610,8 @@ pub fn nodyn(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         #e_num
-        #features
+        #standard_impl
+        #optional_impl
         #(#method_impls)*
         #(#trait_impls)*
         #(#vec_wrappers)*
@@ -636,7 +622,7 @@ pub fn nodyn(input: TokenStream) -> TokenStream {
 
 pub(crate) mod keyword {
     syn::custom_keyword!(vec);
-    syn::custom_keyword!(From);
+    // syn::custom_keyword!(From);
     syn::custom_keyword!(TryInto);
     syn::custom_keyword!(is_as);
     syn::custom_keyword!(introspection);
