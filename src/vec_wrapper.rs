@@ -1,15 +1,15 @@
 use core::option::Option::None;
 use proc_macro2::{Ident, Span, TokenStream, TokenTree};
-use quote::{ToTokens, quote};
+use quote::{quote, ToTokens};
 use syn::spanned::Spanned;
 use syn::{
-    Attribute, Fields, GenericParam, Generics, ItemStruct, Meta, Token, Visibility, WherePredicate,
     parse::{Parse, ParseStream, Parser},
     parse_quote,
     punctuated::Punctuated,
+    Attribute, Fields, GenericParam, Generics, ItemStruct, Meta, Token, Visibility, WherePredicate,
 };
 
-use crate::{GenericsExt, NodynEnum, camel_to_snake};
+use crate::{camel_to_snake, GenericsExt, NodynEnum};
 
 /// Represents a wrapper struct for a collection of enum variants in the `nodyn` crate.
 /// Currently only `Vec` wrappers are supported.
@@ -140,7 +140,6 @@ impl Parse for VecWrapper {
         wrapper.attrs = attrs;
 
         Ok(Self {
-            // ident: wrapper.ident.clone(),
             definition: wrapper,
             vec_field,
             is_custom: true,
@@ -157,7 +156,6 @@ impl VecWrapper {
         generics: &Generics,
         derive_attr: &[Attribute],
     ) -> Self {
-        // let pound = syn::token::Pound::default();
         let wrapper: ItemStruct = parse_quote! {
             #[derive(Default)]
             #(#derive_attr)*
@@ -849,9 +847,7 @@ impl VecWrapper {
         let where_clause = self.to_where(nodyn);
         let enum_generics = nodyn.to_generics();
         let snake_ident = Ident::new(&camel_to_snake(&ident.to_string()), ident.span());
-        // let pound = syn::token::Pound::default();
 
-        // let new_type = &nodyn.generics.new_type();
         quote! {
             impl #generics ::core::convert::From<&[#enum_ident #enum_generics]> for #ident #generics #where_clause {
                 fn from(s: &[#enum_ident #enum_generics]) -> #ident #generics {
