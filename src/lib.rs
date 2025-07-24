@@ -594,18 +594,18 @@ use quote::quote;
 use syn::parse_macro_input;
 
 mod feature;
-mod impl_block;
+mod method_impl;
 mod nodyn_enum;
-mod trait_block;
+mod trait_impl;
 mod variant;
-mod wrapper_struct;
+mod vec_wrapper;
 
 pub(crate) use feature::Features;
-pub(crate) use impl_block::ImplBlock;
+pub(crate) use method_impl::MethodImpl;
 pub(crate) use nodyn_enum::NodynEnum;
-pub(crate) use trait_block::TraitBlock;
-pub(crate) use variant::Variant;
-pub(crate) use wrapper_struct::WrapperStruct;
+pub(crate) use trait_impl::TraitImpl;
+pub(crate) use variant::{camel_to_snake, Variant};
+pub(crate) use vec_wrapper::VecWrapper;
 
 /// Creates a wrapper `enum` for a set of types with automatic method and trait delegation.
 #[allow(clippy::missing_panics_doc)]
@@ -613,23 +613,22 @@ pub(crate) use wrapper_struct::WrapperStruct;
 pub fn nodyn(input: TokenStream) -> TokenStream {
     let nodyn_enum = parse_macro_input!(input as NodynEnum);
 
-    let e_num = nodyn_enum.generate_enum();
+    let e_num = nodyn_enum.to_enum_definition();
     let features = nodyn_enum.generate_features();
-    let impl_blocks = nodyn_enum.generate_impl_blocks();
-    let trait_blocks = nodyn_enum.generate_trait_blocks();
-    let collection_structs = nodyn_enum
-        .collection_structs
+    let method_impls = nodyn_enum.to_method_impls();
+    let trait_impls = nodyn_enum.to_trait_impls();
+    let vec_wrappers = nodyn_enum
+        .vec_wrappers
         .iter()
-        .map(|s| s.vec_general_code(&nodyn_enum))
+        .map(|s| s.to_token_stream(&nodyn_enum))
         .collect::<Vec<_>>();
 
     let expanded = quote! {
         #e_num
         #features
-        #(#impl_blocks)*
-        #(#trait_blocks)*
-
-        #(#collection_structs)*
+        #(#method_impls)*
+        #(#trait_impls)*
+        #(#vec_wrappers)*
     };
 
     TokenStream::from(expanded)
@@ -641,16 +640,24 @@ pub(crate) mod keyword {
     syn::custom_keyword!(TryInto);
     syn::custom_keyword!(is_as);
     syn::custom_keyword!(introspection);
+    // syn::custom_keyword!(from);
+    // syn::custom_keyword!(str);
 }
 
 use proc_macro2::{Ident, Span};
 use syn::{Generics, Lifetime};
 
+/// Extension trait for managing generics in macro code generation.
 pub(crate) trait GenericsExt {
+    /// Checks if the generics include a specific lifetime.
     fn contains_lifetime(&self, other: &str) -> bool;
+    /// Checks if the generics include a specific type parameter.
     fn contains_type(&self, other: &str) -> bool;
+    /// Generates a new, unused lifetime.
     fn new_lifetime(&self) -> Lifetime;
+    /// Generates a new, unused type identifier.
     fn new_type(&self) -> Ident;
+    /// Generates multiple new, unused type identifiers.
     fn new_types(&self, count: u8) -> Vec<Ident>;
 }
 

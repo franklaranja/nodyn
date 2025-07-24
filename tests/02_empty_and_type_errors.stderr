@@ -1,4 +1,4 @@
-error: This type can't be used
+error: Unsupported type for variant identifier
  --> tests/02_empty_and_type_errors.rs:5:9
   |
 5 |         *mut u32,

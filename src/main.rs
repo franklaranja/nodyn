@@ -48,4 +48,10 @@ fn main() {
     for x in test {
         println!("{x:?}");
     }
+
+    let foo_vec: Vec<Foo> = vec!["a".into(), 3.into()];
+    let test2: FooVec = foo_vec.into();
+    println!("{test2:?}");
+    let test2 = foo_vec!["a", "b", 33];
+    println!("{test2:?}");
 }

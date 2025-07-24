@@ -1,19 +1,19 @@
-use syn::{Path, parse::Parse};
+use syn::{parse::Parse, Path};
 
-use crate::ImplBlock;
+use crate::MethodImpl;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub(crate) struct TraitBlock {
+pub(crate) struct TraitImpl {
     pub(crate) path: Path,
-    pub(crate) block: ImplBlock,
+    pub(crate) block: MethodImpl,
 }
 
-impl Parse for TraitBlock {
+impl Parse for TraitImpl {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         Ok(Self {
             path: input.parse::<Path>()?,
-            block: input.parse::<ImplBlock>()?,
+            block: input.parse::<MethodImpl>()?,
         })
     }
 }

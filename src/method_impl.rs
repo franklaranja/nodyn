@@ -1,17 +1,17 @@
 use proc_macro2::{Delimiter, Group, TokenStream, TokenTree};
 use quote::quote;
-use syn::{FnArg, ImplItem, parse::Parse, parse2};
+use syn::{parse::Parse, parse2, FnArg, ImplItem};
 
 use crate::NodynEnum;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub(crate) struct ImplBlock {
+pub(crate) struct MethodImpl {
     pub(crate) items: Vec<syn::ImplItem>,
     pub(crate) functions: Vec<syn::ImplItemFn>,
 }
 
-impl Parse for ImplBlock {
+impl Parse for MethodImpl {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         // let _keyword = input.parse::<syn::token::Impl>()?;
 
@@ -46,7 +46,7 @@ impl Parse for ImplBlock {
     }
 }
 
-impl ImplBlock {
+impl MethodImpl {
     pub(crate) fn expand_methods(&self, wrapper: &NodynEnum) -> Vec<TokenStream> {
         self.functions
             .iter()
@@ -55,7 +55,7 @@ impl ImplBlock {
                     let arms = wrapper
                         .variants
                         .iter()
-                        .map(|v| v.fn_call(&wrapper.ident, &f.sig.ident, &f.sig.inputs));
+                        .map(|v| v.to_fn_call_arm(&wrapper.ident, &f.sig.ident, &f.sig.inputs));
                     let attrs = &f.attrs;
                     let vis = &f.vis;
                     let signature = &f.sig;
