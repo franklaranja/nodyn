@@ -291,6 +291,25 @@ impl VecWrapper {
     /// - [`reverse`][std::vec::Vec::reverse]
     /// - [`iter`][std::vec::Vec::iter]
     /// - [`iter_mut`][std::vec::Vec::iter_mut]
+    ///
+    /// "new":
+    ///
+    /// - `fn clear(&mut self)`
+    /// - `fn len(&self) -> usize`
+    /// - `fn is_empty(&self) -> bool`
+    ///
+    /// todo:
+    ///   pub fn is_sorted(&self) -> bool where T: PartialOrd,
+    ///   pub fn sort(&mut self) where T: Ord,
+    ///   fn sort_unstable(&mut self) where T: Ord,
+    ///   pub fn to_vec(&self) -> Vec<T> where T: Clone,
+    ///   fn rotate_left(&mut self, mid: usize)
+    ///   fn rotate_right(&mut self, k: usize)
+    ///   fn fill(&mut self, value: T) where T: Clone,
+    ///   fn fill_with<F>(&mut self, f: F) where F: FnMut() -> T,
+    ///   fn clone_from_slice(&mut self, src: &[T]) where T: Clone,
+    ///   fn copy_from_slice(&mut self, src: &[T]) where T: Copy,
+    ///   fn copy_within<R>(&mut self, src: R, dest: usize) where R: RangeBounds<usize>, T: Copy,
     #[allow(clippy::too_many_lines)]
     fn to_standard_methods(&self, nodyn: &NodynEnum) -> TokenStream {
         if self.vec_field.is_none() {
@@ -542,9 +561,24 @@ impl VecWrapper {
 
             // new
 
-            #visibility fn len(&mut self) -> usize {
+            // #visibility fn drain<#new_type>(&mut self, range: #new_type) -> ::std::vec::Drain<'_, <#enum_ident #enum_generics>>
+            // where #new_type: ::core::ops::RangeBounds<usize>,
+            // {
+            //     self.#field.drain(range)
+            // }
+
+            #visibility fn clear(&mut self) {
+                self.#field.clear();
+            }
+
+            #visibility const fn len(&self) -> usize {
                 self.#field.len()
             }
+
+            #visibility const fn is_empty(&self) -> bool {
+                self.#field.is_empty()
+            }
+
         }
     }
 

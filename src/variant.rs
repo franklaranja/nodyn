@@ -141,6 +141,18 @@ impl Variant {
     ///
     /// Generates methods like `first_`, `first_mut_`, `last_`, `last_mut_`, `iter_`, `iter_mut_`,
     /// and `count_` for the variant, tailored to its type.
+    ///
+    /// TODO: - From<Vec<Variant>> &Vec &[T] &mut  (Box/Array?)
+    ///       - append
+    ///       - extend_from_slice
+    ///       - AsRef<[T]> & AsMut Vecs to
+    ///       - Extend T, &T
+    ///       - FromIterator<T>
+    ///       - all_type
+    ///       - any_type
+    ///       - enumarate_type
+    ///       - max & min (Ord)
+    ///
     pub(crate) fn generate_vec_methods(
         &self,
         enum_ident: &Ident,
