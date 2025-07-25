@@ -291,25 +291,20 @@ impl VecWrapper {
     /// - [`reverse`][std::vec::Vec::reverse]
     /// - [`iter`][std::vec::Vec::iter]
     /// - [`iter_mut`][std::vec::Vec::iter_mut]
+    /// - [`clear`][std::vec::Vec::clear]
+    /// - [`len`][std::vec::Vec::len]
+    /// - [`is_empty`][std::vec::Vec::is_empty]
+    /// - [`fill_with`][std::vec::Vec::fill_with]
+    /// - [`rotate_left`][std::vec::Vec::rotate_left]
+    /// - [`rotate_right`][std::vec::Vec::rotate_right]
     ///
-    /// "new":
-    ///
-    /// - `fn clear(&mut self)`
-    /// - `fn len(&self) -> usize`
-    /// - `fn is_empty(&self) -> bool`
-    ///
-    /// todo:
-    ///   pub fn is_sorted(&self) -> bool where T: PartialOrd,
-    ///   pub fn sort(&mut self) where T: Ord,
-    ///   fn sort_unstable(&mut self) where T: Ord,
-    ///   pub fn to_vec(&self) -> Vec<T> where T: Clone,
-    ///   fn rotate_left(&mut self, mid: usize)
-    ///   fn rotate_right(&mut self, k: usize)
-    ///   fn fill(&mut self, value: T) where T: Clone,
-    ///   fn fill_with<F>(&mut self, f: F) where F: FnMut() -> T,
-    ///   fn clone_from_slice(&mut self, src: &[T]) where T: Clone,
-    ///   fn copy_from_slice(&mut self, src: &[T]) where T: Copy,
-    ///   fn copy_within<R>(&mut self, src: R, dest: usize) where R: RangeBounds<usize>, T: Copy,
+    //
+    // TODO:
+    //   pub fn is_sorted(&self) -> bool where T: PartialOrd,
+    //   pub fn sort(&mut self) where T: Ord,
+    //   fn sort_unstable(&mut self) where T: Ord,
+    //   fn copy_from_slice(&mut self, src: &[T]) where T: Copy,
+    //   fn copy_within<R>(&mut self, src: R, dest: usize) where R: RangeBounds<usize>, T: Copy,
     #[allow(clippy::too_many_lines)]
     fn to_standard_methods(&self, nodyn: &NodynEnum) -> TokenStream {
         if self.vec_field.is_none() {
@@ -567,18 +562,42 @@ impl VecWrapper {
             //     self.#field.drain(range)
             // }
 
+            /// Clears the vector, removing all values.
+            /// See [`std::vec::Vec::clear`].
             #visibility fn clear(&mut self) {
                 self.#field.clear();
             }
 
+            /// Returns the number of elements in the vector.
+            /// See [`std::vec::Vec::len`].
             #visibility const fn len(&self) -> usize {
                 self.#field.len()
             }
 
+            /// Returns `true` if the vector contains no elements.
+            /// See [`std::vec::Vec::is_empty`].
             #visibility const fn is_empty(&self) -> bool {
                 self.#field.is_empty()
             }
 
+            /// Fills `self` with elements returned by calling a closure repeatedly.
+            /// See [`std::vec::Vec::fill_with`].
+            #visibility fn fill_with<#new_type>(&mut self, f: #new_type)
+            where #new_type: ::core::ops::FnMut() -> #enum_ident #enum_generics {
+                self.#field.fill_with(f);
+            }
+
+            /// Rotates the slice in-place such that the first mid elements of the slice move to the end while the last self.len() - mid elements move to the front.
+            /// See [`std::vec::Vec::rotate_left`].
+            #visibility fn rotate_left(&mut self, mid: usize) {
+                self.#field.rotate_left(mid)
+            }
+
+            /// Rotates the slice in-place such that the first self.len() - k elements of the slice move to the end while the last k elements move to the front.
+            /// See [`std::vec::Vec::rotate_right`].
+            #visibility fn rotate_right(&mut self, k: usize) {
+                self.#field.rotate_right(k)
+            }
         }
     }
 
@@ -754,6 +773,7 @@ impl VecWrapper {
     /// Generates methods and traits that require `Default`.
     ///
     /// - [`From<Vec<Enum>>`][std::vec::Vec]
+    /// - `From<Vec<T>> where T: Into<enum>` (all variants)
     /// - [`FromIterator<Enum>`][std::iter::FromIterator]
     /// - [`new`][std::vec::Vec::new]
     /// - [`with_capacity`][std::vec::Vec::with_capacity]
@@ -770,6 +790,19 @@ impl VecWrapper {
         let where_clause = self.to_where(nodyn);
         let enum_generics = nodyn.to_generics();
         let new_type = &nodyn.generics.new_type();
+        let variants = nodyn.variants.iter().map(|variant| {
+            let ty = &variant.ty;
+            quote!{
+                impl #generics ::core::convert::From<::std::vec::Vec<#ty>> for #ident #generics #where_clause {
+                    fn from(v: ::std::vec::Vec<#ty>) -> Self {
+                        Self {
+                            #field: v.into_iter().map(::core::convert::Into::into).collect(),
+                            ..::core::default::Default::default()
+                        }
+                    }
+                }
+            }
+        }).collect::<Vec<_>>();
 
         quote! {
             impl #generics ::core::convert::From<::std::vec::Vec<#enum_ident #enum_generics>> for #ident #generics #where_clause {
@@ -789,6 +822,8 @@ impl VecWrapper {
                     }
                 }
             }
+
+            #(#variants)*
 
             impl #generics #ident #generics #where_clause {
                 /// Creates a new empty wrapper.
@@ -820,10 +855,13 @@ impl VecWrapper {
 
     /// Generates traits and methods that require `Clone`.
     ///
-    /// - [`Extend<Enum>`][std::iter::Extend]
+    /// - [`Extend<Enum>`][std::iter::Extend] also for each variant
     /// - [`resize`][std::vec::Vec::resize]
     /// - [`extend_from_within`][std::vec::Vec::extend_from_within]
     /// - [`extend_from_slice`][std::vec::Vec::extend_from_slice]
+    /// - [`clone_from_slice`][std::vec::Vec::clone_from_slice]
+    /// - [`to_vec`][std::vec::Vec::to_vec]
+    /// - [`fill`][std::vec::Vec::fill]
     fn to_impl_with_clone(&self, nodyn: &NodynEnum) -> TokenStream {
         if self.vec_field.is_none() || !self.derived_traits.contains(&"Clone".to_string()) {
             return TokenStream::new();
@@ -837,12 +875,25 @@ impl VecWrapper {
         let enum_generics = nodyn.to_generics();
         let new_type = &nodyn.generics.new_type();
 
+        let variants = nodyn.variants.iter().map(|variant| {
+            let ty = &variant.ty;
+            quote!{
+                impl #generics ::core::iter::Extend<#ty> for #ident #generics #where_clause {
+                    fn extend<#new_type: ::core::iter::IntoIterator<Item = #ty>>(&mut self, iter: #new_type) {
+                        self.#field.extend(iter.into_iter().map(::core::convert::Into::into))
+                    }
+                }
+            }
+        }).collect::<Vec<_>>();
+
         quote! {
             impl #generics ::core::iter::Extend<#enum_ident #enum_generics> for #ident #generics #where_clause {
                 fn extend<#new_type: ::core::iter::IntoIterator<Item = #enum_ident #enum_generics>>(&mut self, iter: #new_type) {
                     self.#field.extend(iter.into_iter())
                 }
             }
+
+            #(#variants)*
 
             impl #generics #ident #generics #where_clause {
                 /// Resizes the vector to the new length, using the provided value.
@@ -864,14 +915,34 @@ impl VecWrapper {
                 #visibility fn extend_from_slice(&mut self, other: &[#enum_ident #enum_generics]) {
                     self.#field.extend_from_slice(other);
                 }
+
+                /// Copies the elements from src into self.
+                /// See [`std::vec::Vec::clone_from_slice`].
+                #visibility fn clone_from_slice(&mut self, other: &[#enum_ident #enum_generics]) {
+                    self.#field.clone_from_slice(other);
+                }
+
+                /// Copies self into a new Vec.
+                /// See [`std::vec::Vec::clone_from_slice`].
+                #visibility fn to_vec(&self) -> Vec<#enum_ident #enum_generics> {
+                    self.#field.to_vec()
+                }
+
+                /// Fills self with elements by cloning value.
+                /// Accepts `Into<Enum>` for the value.
+                /// See [`std::vec::Vec::fill`].
+                #visibility fn fill<#new_type: ::core::convert::Into<#enum_ident #enum_generics>>(&mut self, value: #new_type) {
+                    self.#field.fill(value.into());
+                }
             }
         }
     }
 
     /// Generates traits and methods that require both `Clone` and `Default`.
     ///
-    /// - [`From<&[Enum]>`][std::vec::Vec]
-    /// - [`From<&mut [Enum]>`][std::vec::Vec]
+    /// - [`From<&[Enum]>`][std::vec::Vec] also for each variant
+    /// - [`From<&mut [Enum]>`][std::vec::Vec] also for each variant
+    ///
     /// - A macro named after the wrapper in snake case for convenient construction.
     fn to_impl_with_clone_default(&self, nodyn: &NodynEnum) -> TokenStream {
         if self.vec_field.is_none()
@@ -895,6 +966,28 @@ impl VecWrapper {
         } else {
             (quote! { $crate::#ident }, quote! { $crate::#enum_ident })
         };
+        let variants = nodyn.variants.iter().map(|variant| {
+            let ty = &variant.ty;
+            quote!{
+                impl #generics ::core::convert::From<&[#ty]> for #ident #generics #where_clause {
+                    fn from(s: &[#ty]) -> #ident #generics {
+                        Self {
+                           #field: s.iter().cloned().map(::core::convert::Into::into).collect(),
+                            ..::core::default::Default::default()
+                        }
+                    }
+                }
+
+                impl #generics ::core::convert::From<&mut [#ty]> for #ident #generics #where_clause {
+                    fn from(s: &mut [#ty]) -> #ident #generics {
+                        Self {
+                           #field: s.iter().cloned().map(::core::convert::Into::into).collect(),
+                            ..::core::default::Default::default()
+                        }
+                    }
+                }
+            }
+        }).collect::<Vec<_>>();
 
         quote! {
             impl #generics ::core::convert::From<&[#enum_ident #enum_generics]> for #ident #generics #where_clause {
@@ -914,6 +1007,8 @@ impl VecWrapper {
                     }
                 }
             }
+
+            #(#variants)*
 
             #[macro_export]
             macro_rules! #snake_ident {

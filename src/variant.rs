@@ -139,20 +139,28 @@ impl Variant {
 
     /// Generates methods for accessing and iterating over variants in a `Vec`.
     ///
-    /// Generates methods like `first_`, `first_mut_`, `last_`, `last_mut_`, `iter_`, `iter_mut_`,
-    /// and `count_` for the variant, tailored to its type.
+    /// Generates methods:
+    /// - `first_varient`,
+    /// - `first_variant_mut`,
+    /// - `last_variant`,
+    /// - `last_variant_mut`,
+    /// - `iter_variant`
+    /// - `iter_variant_mut`
+    /// - `enumerate_variant`
+    /// - `enumerste_variant_mut`
+    /// - `count_variant`
+    /// - `all_variant`
+    /// - `any_variant`
     ///
-    /// TODO: - From<Vec<Variant>> &Vec &[T] &mut  (Box/Array?)
-    ///       - append
-    ///       - extend_from_slice
-    ///       - AsRef<[T]> & AsMut Vecs to
-    ///       - Extend T, &T
-    ///       - FromIterator<T>
-    ///       - all_type
-    ///       - any_type
-    ///       - enumarate_type
-    ///       - max & min (Ord)
-    ///
+    // TODO: - From<Vec<Variant>> &Vec &[T] &mut  (Box/Array?)
+    //       - append_type
+    //       - extend_from_slice
+    //       - AsRef<[T]> & AsMut Vecs to
+    //       - Extend T, &T
+    //       - FromIterator<T>
+    //       - max & min (Ord)
+    //
+    #[allow(clippy::too_many_lines)]
     pub(crate) fn generate_vec_methods(
         &self,
         enum_ident: &Ident,
@@ -183,8 +191,23 @@ impl Variant {
         let fn_iter_mut_doc =
             format!("Returns a mutable iterator over `{ident}` as `&mut {type_name}`.");
 
+        let fn_enumerate = Ident::new(&format!("enumerate_{snake}"), ty.span());
+        let fn_enumerate_doc =
+            format!("Returns an iterator over `{ident}` as (index, `&{type_name}`).");
+
+        let fn_enumerate_mut = Ident::new(&format!("enumerate_{snake}_mut"), ty.span());
+        let fn_enumerate_mut_doc =
+            format!("Returns a mutable iterator over `{ident}` as (index, `&mut {type_name}`).");
+
         let fn_count = Ident::new(&format!("count_{snake}"), ty.span());
         let fn_count_doc = format!("Counts the number of `{ident}` variants in `{enum_ident}`.");
+
+        let fn_all = Ident::new(&format!("all_{snake}"), ty.span());
+        let fn_all_doc =
+            format!("Returns true if all variants are `{ident}` variants in `{enum_ident}`.");
+
+        let fn_any = Ident::new(&format!("any_{snake}"), ty.span());
+        let fn_any_doc = format!("Returns true there is a `{ident}` variants in `{enum_ident}`.");
 
         quote! {
             #[doc = #fn_first_doc]
@@ -253,10 +276,43 @@ impl Variant {
                 })
             }
 
+            #[doc = #fn_enumerate_doc]
+            pub fn #fn_enumerate(&self) -> impl ::core::iter::Iterator<Item = (usize, &#ty)> {
+                self.#vec_field.iter().enumerate().filter_map(|(i, item)| {
+                    if let #enum_ident::#ident(value) = item {
+                        Some((i, value))
+                    } else {
+                        None
+                    }
+                })
+            }
+
+            #[doc = #fn_enumerate_mut_doc]
+            pub fn #fn_enumerate_mut(&mut self) -> impl ::core::iter::Iterator<Item = (usize, &mut #ty)> {
+                self.#vec_field.iter_mut().enumerate().filter_map(|(i, item)| {
+                    if let #enum_ident::#ident(value) = item {
+                        Some((i, value))
+                    } else {
+                        None
+                    }
+                })
+            }
+
             #[doc = #fn_count_doc]
             pub fn #fn_count(&self) -> usize {
                 self.#vec_field.iter().filter(|item| matches!(item, #enum_ident::#ident(_))).count()
             }
+
+            #[doc = #fn_all_doc]
+            pub fn #fn_all(&self) -> bool {
+                self.#vec_field.iter().all(|item| ::std::matches!(item, #enum_ident::#ident(_)))
+            }
+
+            #[doc = #fn_any_doc]
+            pub fn #fn_any(&self) -> bool {
+                self.#vec_field.iter().any(|item| ::std::matches!(item, #enum_ident::#ident(_)))
+            }
+
         }
     }
 
