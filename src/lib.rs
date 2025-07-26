@@ -637,7 +637,7 @@ pub(crate) use method_impl::MethodImpl;
 pub(crate) use nodyn_enum::NodynEnum;
 pub(crate) use optional_impl::OptionalImpl;
 pub(crate) use trait_impl::TraitImpl;
-pub(crate) use variant::{camel_to_snake, Variant};
+pub(crate) use variant::{Variant, camel_to_snake};
 pub(crate) use vec_wrapper::VecWrapper;
 
 /// Creates a wrapper `enum` for a set of types with automatic method and trait delegation.

@@ -1,4 +1,4 @@
-use syn::{parse::Parse, Token};
+use syn::{Token, parse::Parse};
 
 use crate::keyword;
 

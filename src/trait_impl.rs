@@ -1,4 +1,4 @@
-use syn::{parse::Parse, Path};
+use syn::{Path, parse::Parse};
 
 use crate::MethodImpl;
 

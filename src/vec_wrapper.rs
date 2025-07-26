@@ -1,15 +1,15 @@
 use core::option::Option::None;
 use proc_macro2::{Ident, Span, TokenStream, TokenTree};
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use syn::spanned::Spanned;
 use syn::{
+    Attribute, Fields, GenericParam, Generics, ItemStruct, Meta, Token, Visibility, WherePredicate,
     parse::{Parse, ParseStream, Parser},
     parse_quote,
     punctuated::Punctuated,
-    Attribute, Fields, GenericParam, Generics, ItemStruct, Meta, Token, Visibility, WherePredicate,
 };
 
-use crate::{camel_to_snake, GenericsExt, NodynEnum};
+use crate::{GenericsExt, NodynEnum, camel_to_snake};
 
 /// Represents a wrapper struct for a collection of enum variants in the `nodyn` crate.
 /// Currently only `Vec` wrappers are supported.

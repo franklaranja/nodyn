@@ -2,16 +2,16 @@ use core::option::Option::None; // for analyzer
 use std::collections::HashSet;
 
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote, ToTokens};
+use quote::{ToTokens, format_ident, quote};
 use syn::{
+    Attribute, FnArg, GenericParam, Generics, Ident, Meta, Path, Token, Type, Visibility,
+    WherePredicate,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     spanned::Spanned,
-    Attribute, FnArg, GenericParam, Generics, Ident, Meta, Path, Token, Type, Visibility,
-    WherePredicate,
 };
 
-use crate::{keyword, MethodImpl, OptionalImpl, TraitImpl, Variant, VecWrapper};
+use crate::{MethodImpl, OptionalImpl, TraitImpl, Variant, VecWrapper, keyword};
 
 // mod kw {
 //     syn::custom_keyword!(from);
@@ -627,10 +627,12 @@ mod tests {
             ",
         );
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Duplicate variant type"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Duplicate variant type")
+        );
     }
 
     #[test]

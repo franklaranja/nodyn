@@ -1,6 +1,6 @@
 use proc_macro2::{Delimiter, Group, TokenStream, TokenTree};
 use quote::quote;
-use syn::{parse::Parse, parse2, FnArg, ImplItem};
+use syn::{FnArg, ImplItem, parse::Parse, parse2};
 
 use crate::NodynEnum;
 
