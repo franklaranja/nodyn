@@ -10,7 +10,7 @@ impl fmt::Display for Null {
 }
 
 #[derive(Debug, Clone)]
-pub struct JsonArray(Vec<JsonValue>);
+pub struct JsonArray(JsonValueVec);
 
 impl fmt::Display for JsonArray {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -34,6 +34,8 @@ nodyn::nodyn! {
         JsonArray,
     }
 
+    impl vec;
+
     impl fmt::Display {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
     }
@@ -53,28 +55,12 @@ nodyn::nodyn! {
 }
 
 fn main() {
-    let values: Vec<JsonValue> = vec![
-        Null.into(),                // null
-        true.into(),                // boolean
-        42.0.into(),                // number
-        "hello".to_string().into(), // string
-        JsonArray(vec![
-            Null.into(),
-            false.into(),
-            33.0.into(),
-            "world".to_string().into(),
-        ])
-        .into(),
+    let values = json_value_vec![
+        Null,                // null
+        true,                // boolean
+        42.0,                // number
+        "hello".to_string(), // string
+        JsonArray(json_value_vec![Null, false, 33.0, "world".to_string(),]),
     ];
-
-    for val in &values {
-        println!("{}: {}", val.json_type_name(), val);
-    }
-
-    // output
-    // null: null
-    // boolean: true
-    // number: 42
-    // string: hello
-    // array: [null, false, 33, world]
+    assert_eq!(values.len(), 5);
 }

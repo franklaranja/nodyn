@@ -376,9 +376,9 @@
 //! Nodyn generates a macro for your vec wrapper with the name
 //! of the wrapper changed to snake case. As the `nodyn!` macro
 //! does not know where it is invoked, you have to tell it the
-//! full module path without the crate name, so the generated macro works
-//! correctly. If you don't specify the module path it is assumed to
-//! be the root of the crate.
+//! full module path including the crate name, so the generated
+//! macro works correctly. If you don't specify the module path
+//! it is assumed the vec wrapper and enum are in the lical scope.
 //!
 //! The macro works like `vec!` but accepts any value within your
 //! enum.
@@ -562,7 +562,7 @@
 //!
 //! # Advanced Example
 //!
-//! ```ignore
+//! ```
 //! use std::fmt;
 //!
 //! #[derive(Debug, Clone)]
@@ -585,7 +585,6 @@
 //! }
 //!
 //! nodyn::nodyn! {
-//!     #[module_path = "rust_out"]    // it's in a doc: doesn't work
 //!     #[derive(Debug, Clone)]
 //!     pub enum JsonValue {
 //!         Null,

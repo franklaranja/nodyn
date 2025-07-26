@@ -959,12 +959,9 @@ impl VecWrapper {
         let enum_generics = nodyn.to_generics();
         let snake_ident = Ident::new(&camel_to_snake(&ident.to_string()), ident.span());
         let (macro_vec, macro_enum) = if let Some(path) = &nodyn.module_path {
-            (
-                quote! { $crate::#path::#ident },
-                quote! { $crate::#path::#enum_ident },
-            )
+            (quote! { ::#path::#ident }, quote! { ::#path::#enum_ident })
         } else {
-            (quote! { $crate::#ident }, quote! { $crate::#enum_ident })
+            (quote! { #ident }, quote! { #enum_ident })
         };
         let variants = nodyn.variants.iter().map(|variant| {
             let ty = &variant.ty;

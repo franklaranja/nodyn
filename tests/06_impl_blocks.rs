@@ -1,5 +1,3 @@
-// this file is for dev only, changes all the time
-
 nodyn::nodyn! {
   /// A test of the `nodyn!` macro
   pub enum Foo<'a, 'b> {

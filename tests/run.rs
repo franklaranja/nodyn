@@ -11,4 +11,5 @@ fn tests() {
     t.pass("tests/08_named_variants.rs");
     t.pass("tests/09_type_functions.rs");
     t.pass("tests/10_advanced_example.rs");
+    t.pass("tests/11_vec_wrapper.rs");
 }
