@@ -1,7 +1,7 @@
 //! *Easy polymorphism with enums*
 //!
-//! The `nodyn!` macro generates a Rust `enum` that wraps a fixed set of types, providing automatic
-//! implementations for type conversions, method delegation, and trait delegation. This enables
+//! The `nodyn!` macro generates a Rust `enum` that wraps a fixed set of [types](#supported-types), providing automatic
+//! implementations for type conversions, [method delegation](#method-delegation), and [trait delegation](#trait-delegation). This enables
 //! type-safe storage of different types without the runtime overhead of trait objects, ideal for
 //! scenarios requiring zero-cost abstractions for a known set of types at compile time.
 //!
@@ -12,20 +12,22 @@
 //! - **Enum Wrappers**: Offer type safety and zero-cost abstractions for a fixed set of types,
 //!   as described in [The Rust Programming Language][book].
 //!
-//! The `nodyn!` macro simplifies creating enum wrappers by generating boilerplate for variant creation,
+//! The `nodyn!` macro simplifies [creating enum wrappers](#syntax) by generating boilerplate for variant creation,
 //! type conversions, method/trait delegation, and introspection utilities.
+//! `nodyn!` can also generate a special [polymorphic `Vec`](#vec-wrapper) for your `enum`.
 //!
 //! ## Key Features
 //!
 //! - **Automatic Variant Creation**: Generates an enum with variants for specified types.
-//! - **Type Conversion**: Implements [`From<T>`][std::convert::From] for each variant type and optionally
-//!   [`TryFrom<Enum> for T`][std::convert::TryFrom] for non-reference types (with `TryInto` feature).
-//! - **Method and Trait Delegation**: Delegates methods or entire traits to underlying types.
+//! - **Type Conversion**: Implements `From<T>` for each variant type and optionally
+//!   `TryFrom<Enum>` for `T` for non-reference types (with [`TryInto`](#tryfrom-trait-with-tryinto) feature).
+//!   Additional type conversion tools can be generated with the [`as_is`](#type-checking-and-conversion-methods-with-is_as) feature
+//! - **Method and Trait Delegation**: [Delegates methods](#method-delegation) or entire [traits](#trait-delegation) to underlying types.
 //! - **Type Introspection**: Provides `count`, `types`, and `type_name` methods to query variant
-//!   information (with `introspection` feature).
+//!   information (with [introspection](#type-information-methods-with-introspection) feature).
 //! - **Custom Variant Names**: Allows overriding default variant names for clarity.
-//! - **Vec Wrapper**: Generates a `Vec<Enum>` wrapper with delegated [`std::vec::Vec`] methods and
-//!   and extra functionality to leverage the enums features.
+//! - **Vec Wrapper**: Generates a `Vec<Enum>` wrapper with [delegated `Vec` methods](#delegated-vec-methods-and-traits) and
+//!   and [extra functionality](#variant-methods-and-traits) such as [construction macro](#a-vec-like-macro) to leverage the enums features.
 //!
 //! ## Basic Example
 //!
@@ -187,15 +189,6 @@
 //! }
 //! ```
 //!
-//! - **Enum Definition**: Define the enum with optional visibility, derive attributes, and lifetimes.
-//! - **Variants**: Specify types directly (e.g., `i32`, `String`) or with custom variant names (e.g., `Int(i32)`).
-//! - **Optional Traits & Methods** with `TryInto`, `is_as` and `introspection`
-//! - **Trait Delegation**: Include trait `impl` blocks to delegate trait methods to wrapped types.
-//! - **Method Delegation**: Include regular `impl` blocks to delegate custom methods.
-//! - **Vec Wrapper**: A `Vec` of your enum with methods and traits adapted to your enum.
-//! - **Custom Vec Wrappers**: Specify your own struct and nodyn will add a field for the vec and
-//!   the methods and traits to the struct.
-//!
 //! ## Generated Methods
 //!
 //! ### Type Information Methods (with `introspection`)
@@ -301,7 +294,7 @@
 //! assert!(!container.is_empty());
 //! ```
 //!
-//! # Trait Implementation
+//! # Trait Delegation
 //!
 //! When all wrapped types implement a trait, you can implement it for the wrapper
 //! by delegating the required methods:
@@ -353,7 +346,7 @@
 //! assert_eq!(values.len(), 2);
 //! ```
 //!
-//! ### Simple Wrappers
+//! ### Simple Vec Wrappers
 //!
 //! Using `impl vec` generates a wrapper named after the enum with the extension Vec.
 //! The generated wrapper has the same derive attributes as the enum, plus
@@ -411,7 +404,7 @@
 //! let my_values = values!["hello", 42, "world", 0.1];
 //! ```
 //!
-//! ### Custom Wrappers
+//! ### Custom Vec Wrappers
 //!
 //! Define a custom wrapper struct with additional fields using the
 //! `#[vec]` or `#[vec(field_name)]` attribute. Without
@@ -421,6 +414,8 @@
 //!
 //! I recommend you put a `#[derive('Default)]` on your custom vec wrapper
 //! so nodyn can generate the macro and implement the From trait.
+//!
+//! #### Example
 //!
 //! ```rust
 //! nodyn::nodyn! {
@@ -446,7 +441,7 @@
 //! assert_eq!(values.len(), 1);
 //! ```
 //!
-//! ### implemented methods and traits
+//! ### Variant methods and traits
 //!
 //! For each variant the following methods are generated for the wrapper:
 //!
@@ -457,97 +452,99 @@
 //! | `count_*`         | none | Counts all items of variant, iteratimg over whole vec |
 //! | `enumerate_*_mut` | none | idem.                  |
 //! | `enumerate_*`     | none | Enumerate with index from the wrapper |
-//! | `first_*_mut`     | none | [`std::vec::first_mut`]|
-//! | `first_*`         | none | [`std::vec::first`]    |
-//! | `iter_*_mut`      | none | [`std::vec::last_mut`] |
-//! | `iter_*`          | none | [`std::vec::last`]     |
-//! | `last_*_mut`      | none | [`std::vec::last_mut`] |
-//! | `last_*`          | none | [`std::vec::last`]     |
+//! | `first_*_mut`     | none | [`first_mut`][core::slice:first_mut()]|
+//! | `first_*`         | none | [`first`][core::slice:first()]    |
+//! | `iter_*_mut`      | none | [`std::slice:last_mut()`] |
+//! | `iter_*`          | none | [`std::slice:last()`]     |
+//! | `last_*_mut`      | none | [`std::slice:last_mut()`] |
+//! | `last_*`          | none | [`std::slice:last()`]     |
 //!
 //! And the following traits for each variant with type V:
 //!
 //! | trait             | required trait      |
-//! |-------------------|------------------=--|
+//! |-------------------|---------------------|
 //! | `Extend<V>`       | `Clone`             |
 //! | `From<&[V]>`      | `Default` & `Clone` |
 //! | `From<&mut [V]>`  | `Default` & `Clone` |
 //! | `From<Vec<V>>`    | `Default`           |
 //!
-//! the `vec` wrapper implements many [`std::vec::vec`] methods and traits, with some modified to
+//! ### Delegated `Vec` methods and traits
+//!
+//! the `vec` wrapper implements many [`std::vec::Vec`] methods and traits, with some modified to
 //! leverage `nodyn` features. the following table summarizes them:
 //!
 //! | method | required traits | differences from [`std::vec::Vec`] |
 //! |--------|-----------------|------------------------------------|
-//! | [`append`][std::vec::Vec::append]                     | none | none; direct delegation. |
-//! | [`as_mut_slice`][std::vec::Vec::as_mut_slice]         | none | none; direct delegation. |
-//! | [`as_slice`][std::vec::Vec::as_slice]                 | none | none; direct delegation. |
-//! | [`binary_search_by_key`][std::vec::Vec::binary_search_key] | none | none; direct delegation. |
-//! | [`binary_search_by`][std::vec::Vec::binary_search]    | none    | none; direct delegation. |
-//! | [`binary_search`][std::vec::Vec::binary_search]       | `Ord`   | none; direct delegation. |
-//! | [`capacity`][std::vec::Vec::capacity]                 | none | none; direct delegation. |
-//! | [`clear`][std::vec::Vec::clear]                       | none | none; direct delegation. |
-//! | [`clone_from_slice`][std::vec::Vec::clone_from_slice] | `Clone` | none; direct delegation. |
-//! | [`copy_from_slice`][std::vec::Vec::copy_from_slice]   | `Copy`  | none; direct delegation. |
-//! | [`copy_within`][std::vec::Vec::copy_within]           | `Copy`  | none; direct delegation. |
-//! | [`dedup_by_key`][std::vec::Vec::dedup_by_key]         | none | none; direct delegation. |
-//! | [`dedup_by`][std::vec::Vec::dedup_by]                 | none | none; direct delegation. |
-//! | [`dedup`][std::vec::Vec::dedup]                       | `PartialEq` | none; direct delegation. |
-//! | [`extend_from_slice`][std::vec::Vec::extend_from_slice]   | `Clone` | none; direct delegation. |
-//! | [`extend_from_within`][std::vec::Vec::extend_from_within] | `Clone` | none; direct delegation. |
-//! | [`extract_if`][std::vec::Vec::extract_if]             | none | none; direct delegation. |
-//! | [`fill_with`][std::vec::Vec::fill_with]               | none    | accepts `Into<enum>`. |
-//! | [`fill`][std::vec::Vec::fill]                         | `Clone` | none; direct delegation. |
-//! | [`first_mut`][std::vec::Vec::first_mut]               | none | none; direct delegation. |
-//! | [`first`][std::vec::Vec::first]                       | none | none; direct delegation. |
-//! | [`get_mut`][std::vec::Vec::get_mut]                   | none | none; direct delegation. |
-//! | [`get`][std::vec::Vec::get]                           | none | none; direct delegation. |
-//! | [`insert`][std::vec::Vec::insert]                     | none | accepts `Into<enum>`. |
-//! | [`into_boxed_slice`][std::vec::Vec::into_boxed_slice] | none | none; direct delegation. |
-//! | [`is_empty`][std::vec::Vec::is_empty]                 | none | none; direct delegation. |
-//! | [`is_sorted_by_key`][std::vec::Vec::is_sorted_key]    | none | none; direct delegation. |
-//! | [`is_sorted_by`][std::vec::Vec::is_sorted]            | none | none; direct delegation. |
-//! | [`is_sorted`][std::vec::Vec::is_sorted]               | `PartialOrd`    | none; direct delegation. |
-//! | [`iter_mut`][std::vec::Vec::iter_mut]                 | none | none; direct delegation. |
-//! | [`iter`][std::vec::Vec::iter]                         | none | none; direct delegation. |
-//! | [`last_mut`][std::vec::Vec::last_mut]                 | none | none; direct delegation. |
-//! | [`last`][std::vec::Vec::last]                         | none | none; direct delegation. |
-//! | [`len`][std::vec::Vec::len]                           | none | none; direct delegation. |
-//! | [`new`][std::vec::Vec::new]                           | `Default`   | initializes other fields with `Default::default()`. |
-//! | [`pop_if`][std::vec::Vec::pop_if]                     | none | none; direct delegation. |
-//! | [`pop`][std::vec::Vec::pop]                           | none | none; direct delegation. |
-//! | [`push`][std::vec::Vec::push]                         | none | accepts `Into<enum>`. |
-//! | [`remove`][std::vec::Vec::remove]                     | none | none; direct delegation. |
-//! | [`reserve_exact`][std::vec::Vec::reserve_exact]       | none | none; direct delegation. |
-//! | [`reserve`][std::vec::Vec::reserve]                   | none | none; direct delegation. |
-//! | [`resize`][std::vec::Vec::resize]                     | `Clone`     | accepts `Into<enum>`. |
-//! | [`retain_mut`][std::vec::Vec::retain_mut]             | none | none; direct delegation. |
-//! | [`retain`][std::vec::Vec::retain]                     | none | none; direct delegation. |
-//! | [`reverse`][std::vec::Vec::reverse]                   | none | none; direct delegation. |
-//! | [`rotate_left`][std::vec::Vec::rotate_left]           | none    | none; direct delegation. |
-//! | [`rotate_right`][std::vec::Vec::rotate_right]         | none    | none; direct delegation. |
-//! | [`shrink_to_fit`][std::vec::Vec::shrink_to_fit]       | none | none; direct delegation. |
-//! | [`shrink_to`][std::vec::Vec::shrink_to]               | none | none; direct delegation. |
-//! | [`sort_by_key`][std::vec::Vec::sort_key]              | none    | none; direct delegation. |
-//! | [`sort_by`][std::vec::Vec::sort]                      | none    | none; direct delegation. |
-//! | [`sort_unstable_by_key`][std::vec::Vec::sort_unstable_key] | none | none; direct delegation. |
-//! | [`sort_unstable_by`][std::vec::Vec::sort_unstable]    | none    | none; direct delegation. |
-//! | [`sort_unstable`][std::vec::Vec::sort_unstable]       | `Ord`   | none; direct delegation. |
-//! | [`sort`][std::vec::Vec::sort]                         | `Ord`   | none; direct delegation. |
-//! | [`splice`][std::vec::Vec::splice]                     | none | none; direct delegation. |
-//! | [`split_first_mut`][std::vec::Vec::split_first_mut]   | none | none; direct delegation. |
-//! | [`split_first`][std::vec::Vec::split_first]           | none | none; direct delegation. |
-//! | [`split_last_mut`][std::vec::Vec::split_last_mut]     | none | none; direct delegation. |
-//! | [`split_last`][std::vec::Vec::split_last]             | none | none; direct delegation. |
-//! | [`split_off`][std::vec::Vec::split_off]               | `Default`   | initializes other fields with `Default::default()`. |
-//! | [`swap_remove`][std::vec::Vec::swap_remove]           | none | none; direct delegation. |
-//! | [`swap`][std::vec::Vec::swap]                         | none | none; direct delegation. |
-//! | [`to_vec`][std::vec::Vec::to_vec]                     | `Clone` | none; direct delegation. |
-//! | [`truncate`][std::vec::Vec::truncate]                 | none | none; direct delegation. |
-//! | [`try_reserve_exact`][std::vec::Vec::try_reserve_exact]   | none | none; direct delegation. |
-//! | [`try_reserve`][std::vec::Vec::try_reserve]           | none | none; direct delegation. |
-//! | [`with_capacity`][std::vec::Vec::with_capacity]       | `Default`   | initializes other fields with `Default::default()`. |
+//! | [`append`][std::vec::Vec::append()]                     | none | none; direct delegation. |
+//! | [`as_mut_slice`][std::vec::Vec::as_mut_slice()]         | none | none; direct delegation. |
+//! | [`as_slice`][std::vec::Vec::as_slice()]                 | none | none; direct delegation. |
+//! | [`binary_search_by_key`][std::vec::Vec::binary_search_key()] | none | none; direct delegation. |
+//! | [`binary_search_by`][std::vec::Vec::binary_search()]    | none    | none; direct delegation. |
+//! | [`binary_search`][std::vec::Vec::binary_search()]       | `Ord`   | none; direct delegation. |
+//! | [`capacity`][std::vec::Vec::capacity()]                 | none | none; direct delegation. |
+//! | [`clear`][std::vec::Vec::clear()]                       | none | none; direct delegation. |
+//! | [`clone_from_slice`][std::vec::Vec::clone_from_slice()] | `Clone` | none; direct delegation. |
+//! | [`copy_from_slice`][std::vec::Vec::copy_from_slice()]   | `Copy`  | none; direct delegation. |
+//! | [`copy_within`][std::vec::Vec::copy_within()]           | `Copy`  | none; direct delegation. |
+//! | [`dedup_by_key`][std::vec::Vec::dedup_by_key()]         | none | none; direct delegation. |
+//! | [`dedup_by`][std::vec::Vec::dedup_by()]                 | none | none; direct delegation. |
+//! | [`dedup`][std::vec::Vec::dedup()]                       | `PartialEq` | none; direct delegation. |
+//! | [`extend_from_slice`][std::vec::Vec::extend_from_slice()]   | `Clone` | none; direct delegation. |
+//! | [`extend_from_within`][std::vec::Vec::extend_from_within()] | `Clone` | none; direct delegation. |
+//! | [`extract_if`][std::vec::Vec::extract_if()]             | none | none; direct delegation. |
+//! | [`fill_with`][std::vec::Vec::fill_with()]               | none    | accepts `Into<enum>`. |
+//! | [`fill`][std::vec::Vec::fill()]                         | `Clone` | none; direct delegation. |
+//! | [`first_mut`][std::vec::Vec::first_mut()]               | none | none; direct delegation. |
+//! | [`first`][std::vec::Vec::first()]                       | none | none; direct delegation. |
+//! | [`get_mut`][std::vec::Vec::get_mut()]                   | none | none; direct delegation. |
+//! | [`get`][std::vec::Vec::get()]                           | none | none; direct delegation. |
+//! | [`insert`][std::vec::Vec::insert()]                     | none | accepts `Into<enum>`. |
+//! | [`into_boxed_slice`][std::vec::Vec::into_boxed_slice()] | none | none; direct delegation. |
+//! | [`is_empty`][std::vec::Vec::is_empty()]                 | none | none; direct delegation. |
+//! | [`is_sorted_by_key`][std::vec::Vec::is_sorted_key()]    | none | none; direct delegation. |
+//! | [`is_sorted_by`][std::vec::Vec::is_sorted()]            | none | none; direct delegation. |
+//! | [`is_sorted`][std::vec::Vec::is_sorted()]               | `PartialOrd`    | none; direct delegation. |
+//! | [`iter_mut`][std::vec::Vec::iter_mut()]                 | none | none; direct delegation. |
+//! | [`iter`][std::vec::Vec::iter()]                         | none | none; direct delegation. |
+//! | [`last_mut`][std::vec::Vec::last_mut()]                 | none | none; direct delegation. |
+//! | [`last`][std::vec::Vec::last()]                         | none | none; direct delegation. |
+//! | [`len`][std::vec::Vec::len()]                           | none | none; direct delegation. |
+//! | [`new`][std::vec::Vec::new()]                           | `Default`   | initializes other fields with `Default::default()`. |
+//! | [`pop_if`][std::vec::Vec::pop_if()]                     | none | none; direct delegation. |
+//! | [`pop`][std::vec::Vec::pop()]                           | none | none; direct delegation. |
+//! | [`push`][std::vec::Vec::push()]                         | none | accepts `Into<enum>`. |
+//! | [`remove`][std::vec::Vec::remove()]                     | none | none; direct delegation. |
+//! | [`reserve_exact`][std::vec::Vec::reserve_exact()]       | none | none; direct delegation. |
+//! | [`reserve`][std::vec::Vec::reserve()]                   | none | none; direct delegation. |
+//! | [`resize`][std::vec::Vec::resize()]                     | `Clone`     | accepts `Into<enum>`. |
+//! | [`retain_mut`][std::vec::Vec::retain_mut()]             | none | none; direct delegation. |
+//! | [`retain`][std::vec::Vec::retain()]                     | none | none; direct delegation. |
+//! | [`reverse`][std::vec::Vec::reverse()]                   | none | none; direct delegation. |
+//! | [`rotate_left`][std::vec::Vec::rotate_left()]           | none    | none; direct delegation. |
+//! | [`rotate_right`][std::vec::Vec::rotate_right()]         | none    | none; direct delegation. |
+//! | [`shrink_to_fit`][std::vec::Vec::shrink_to_fit()]       | none | none; direct delegation. |
+//! | [`shrink_to`][std::vec::Vec::shrink_to()]               | none | none; direct delegation. |
+//! | [`sort_by_key`][std::vec::Vec::sort_key()]              | none    | none; direct delegation. |
+//! | [`sort_by`][std::vec::Vec::sort()]                      | none    | none; direct delegation. |
+//! | [`sort_unstable_by_key`][std::vec::Vec::sort_unstable_key()] | none | none; direct delegation. |
+//! | [`sort_unstable_by`][std::vec::Vec::sort_unstable()]    | none    | none; direct delegation. |
+//! | [`sort_unstable`][std::vec::Vec::sort_unstable()]       | `Ord`   | none; direct delegation. |
+//! | [`sort`][std::vec::Vec::sort()]                         | `Ord`   | none; direct delegation. |
+//! | [`splice`][std::vec::Vec::splice()]                     | none | none; direct delegation. |
+//! | [`split_first_mut`][std::vec::Vec::split_first_mut()]   | none | none; direct delegation. |
+//! | [`split_first`][std::vec::Vec::split_first()]           | none | none; direct delegation. |
+//! | [`split_last_mut`][std::vec::Vec::split_last_mut()]     | none | none; direct delegation. |
+//! | [`split_last`][std::vec::Vec::split_last()]             | none | none; direct delegation. |
+//! | [`split_off`][std::vec::Vec::split_off()]               | `Default`   | initializes other fields with `Default::default()`. |
+//! | [`swap_remove`][std::vec::Vec::swap_remove()]           | none | none; direct delegation. |
+//! | [`swap`][std::vec::Vec::swap()]                         | none | none; direct delegation. |
+//! | [`to_vec`][std::vec::Vec::to_vec()]                     | `Clone` | none; direct delegation. |
+//! | [`truncate`][std::vec::Vec::truncate()]                 | none | none; direct delegation. |
+//! | [`try_reserve_exact`][std::vec::Vec::try_reserve_exact()]   | none | none; direct delegation. |
+//! | [`try_reserve`][std::vec::Vec::try_reserve()]           | none | none; direct delegation. |
+//! | [`with_capacity`][std::vec::Vec::with_capacity()]       | `Default`   | initializes other fields with `Default::default()`. |
 //!
-//! | trait | required traits | differences from [`std::vec::vec`] |
+//! | trait | required traits | differences from [`std::vec::Vec`] |
 //! |-------|-----------------|------------------------------------|
 //! | [`AsMut<Self>`][std::convert::AsMut]            | none | returns `&mut self`. |
 //! | [`AsMut<Vec<enum>>`][std::convert::AsMut]       | none | delegates to `vec`. |
@@ -563,7 +560,7 @@
 //! | [`Fromiterator<enum>`][std::iter::FromIterator] | `Default` | initializes other fields with `default::default()`. |
 //! | [`IndexMut`][std::ops::IndexMut]                | none | delegates to `vec::index_mut`. |
 //! | [`Index`][std::ops::Index]                      | none | delegates to `vec::index`. |
-//! | [`IntoIterator`][std::iter::IntoIterator]       | none | implemented for `&self`, `&mut self`, and `self`. |
+//! | [`IntoIterator`]       | none | implemented for `&self`, `&mut self`, and `self`. |
 //!
 //! ## Feature Flags
 //!

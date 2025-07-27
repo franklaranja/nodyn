@@ -967,8 +967,8 @@ impl VecWrapper {
 
     /// Generates traits and methods that require both `Clone` and `Default`.
     ///
-    /// - [`From<&[Enum]>`][std::vec::Vec] also for each variant
-    /// - [`From<&mut [Enum]>`][std::vec::Vec] also for each variant
+    /// - `From<&[Enum]>` also for each variant
+    /// - `From<&mut [Enum]>` also for each variant
     fn with_clone_and_default_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
         if !self.derived_traits.contains(&"Clone".to_string())
             || !self.derived_traits.contains(&"Default".to_string())
@@ -1073,7 +1073,7 @@ impl VecWrapper {
 
         quote! {
             /// Sorts the slice, preserving initial order of equal elements.
-            /// See [`std::vec::Vec::sort`].
+            /// See [`std::vec::Vec::sort()`].
             impl #generics #ident #generics #where_clause {
                 #visibility fn sort(&mut self) {
                     self.#field.sort();
@@ -1081,7 +1081,7 @@ impl VecWrapper {
             }
 
             /// Sorts the slice without preserving the initial order of equal elements.
-            /// See [`std::vec::Vec::sort_unstable`].
+            /// See [`std::vec::Vec::sort_unstable()`].
             impl #generics #ident #generics #where_clause {
                 #visibility fn sort_unstable(&mut self) {
                     self.#field.sort_unstable();
@@ -1089,7 +1089,7 @@ impl VecWrapper {
             }
 
             /// Binary searches this slice for a given element.
-            /// See [`std::vec::Vec::binary_search`].
+            /// See [`std::vec::Vec::binary_search()`].
             impl #generics #ident #generics #where_clause {
                 #visibility fn binary_search(&mut self, x: &#enum_ident #enum_generics) -> ::core::result::Result<usize, usize> {
                     self.#field.binary_search(x)
