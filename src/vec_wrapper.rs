@@ -12,84 +12,10 @@ use syn::{
 use crate::{GenericsExt, NodynEnum, camel_to_snake};
 
 /// Represents a wrapper struct for a collection of enum variants in the `nodyn` crate.
-/// Currently only `Vec` wrappers are supported.
 ///
 /// This struct generates a wrapper around a `Vec<Enum>` with methods that delegate to the underlying
 /// `std::vec::Vec`, plus additional methods for variant-specific access (via `NodynEnum`).
 /// It supports both standard (auto-generated) and custom structs with a `vec_wrapper` attribute.
-///
-/// # Overview of Implemented Methods
-///
-/// The following table lists all methods implemented for the wrapper struct, their required traits,
-/// and differences from their `std::vec::Vec` counterparts:
-///
-/// | Method | Required Traits | Differences from `std::vec::Vec` |
-/// |--------|-----------------|-------------------------------|
-/// | [`new`](#method.new) | `Default` | Initializes other fields with `Default::default()`. |
-/// | [`with_capacity`](#method.with_capacity) | `Default` | Initializes other fields with `Default::default()`. |
-/// | [`split_off`](#method.split_off) | `Default` | Initializes other fields with `Default::default()`. |
-/// | [`dedup`](#method.dedup) | `PartialEq` | None; direct delegation to `Vec::dedup`. |
-/// | [`resize`](#method.resize) | `Clone` | Accepts `Into<Enum>` for the value parameter. |
-/// | [`extend_from_within`](#method.extend_from_within) | `Clone` | None; direct delegation to `Vec::extend_from_within`. |
-/// | [`extend_from_slice`](#method.extend_from_slice) | `Clone` | None; direct delegation to `Vec::extend_from_slice`. |
-/// | [`insert`](#method.insert) | None | Accepts `Into<Enum>` for the element parameter. |
-/// | [`push`](#method.push) | None | Accepts `Into<Enum>` for the value parameter. |
-/// | [`capacity`](#method.capacity) | None | None; direct delegation to `Vec::capacity`. |
-/// | [`reserve`](#method.reserve) | None | None; direct delegation to `Vec::reserve`. |
-/// | [`reserve_exact`](#method.reserve_exact) | None | None; direct delegation to `Vec::reserve_exact`. |
-/// | [`try_reserve`](#method.try_reserve) | None | None; direct delegation to `Vec::try_reserve`. |
-/// | [`try_reserve_exact`](#method.try_reserve_exact) | None | None; direct delegation to `Vec::try_reserve_exact`. |
-/// | [`shrink_to_fit`](#method.shrink_to_fit) | None | None; direct delegation to `Vec::shrink_to_fit`. |
-/// | [`shrink_to`](#method.shrink_to) | None | None; direct delegation to `Vec::shrink_to`. |
-/// | [`into_boxed_slice`](#method.into_boxed_slice) | None | None; direct delegation to `Vec::into_boxed_slice`. |
-/// | [`truncate`](#method.truncate) | None | None; direct delegation to `Vec::truncate`. |
-/// | [`as_slice`](#method.as_slice) | None | None; direct delegation to `Vec::as_slice`. |
-/// | [`as_mut_slice`](#method.as_mut_slice) | None | None; direct delegation to `Vec::as_mut_slice`. |
-/// | [`swap_remove`](#method.swap_remove) | None | None; direct delegation to `Vec::swap_remove`. |
-/// | [`remove`](#method.remove) | None | None; direct delegation to `Vec::remove`. |
-/// | [`retain`](#method.retain) | None | None; direct delegation to `Vec::retain`. |
-/// | [`retain_mut`](#method.retain_mut) | None | None; direct delegation to `Vec::retain_mut`. |
-/// | [`dedup_by_key`](#method.dedup_by_key) | None | None; direct delegation to `Vec::dedup_by_key`. |
-/// | [`dedup_by`](#method.dedup_by) | None | None; direct delegation to `Vec::dedup_by`. |
-/// | [`pop`](#method.pop) | None | None; direct delegation to `Vec::pop`. |
-/// | [`pop_if`](#method.pop_if) | None | None; direct delegation to `Vec::pop_if`. |
-/// | [`append`](#method.append) | None | None; direct delegation to `Vec::append`. |
-/// | [`splice`](#method.splice) | None | None; direct delegation to `Vec::splice`. |
-/// | [`extract_if`](#method.extract_if) | None | None; direct delegation to `Vec::extract_if`. |
-/// | [`first`](#method.first) | None | None; direct delegation to `Vec::first`. |
-/// | [`first_mut`](#method.first_mut) | None | None; direct delegation to `Vec::first_mut`. |
-/// | [`last`](#method.last) | None | None; direct delegation to `Vec::last`. |
-/// | [`last_mut`](#method.last_mut) | None | None; direct delegation to `Vec::last_mut`. |
-/// | [`split_first`](#method.split_first) | None | None; direct delegation to `Vec::split_first`. |
-/// | [`split_first_mut`](#method.split_first_mut) | None | None; direct delegation to `Vec::split_first_mut`. |
-/// | [`split_last`](#method.split_last) | None | None; direct delegation to `Vec::split_last`. |
-/// | [`split_last_mut`](#method.split_last_mut) | None | None; direct delegation to `Vec::split_last_mut`. |
-/// | [`get`](#method.get) | None | None; direct delegation to `Vec::get`. |
-/// | [`get_mut`](#method.get_mut) | None | None; direct delegation to `Vec::get_mut`. |
-/// | [`swap`](#method.swap) | None | None; direct delegation to `Vec::swap`. |
-/// | [`reverse`](#method.reverse) | None | None; direct delegation to `Vec::reverse`. |
-/// | [`iter`](#method.iter) | None | None; direct delegation to `Vec::iter`. |
-/// | [`iter_mut`](#method.iter_mut) |   None | None; direct delegation to `Vec::iter_mut`. |
-///
-/// # Implemented Traits
-///
-/// | Trait | Required Traits | Differences from `std` |
-/// |-------|-----------------|-----------------------|
-/// | [`From<Self>`](#impl-From<Self>) | None | Converts to `Vec<Enum>`. |
-/// | [`Index`](#impl-Index) | None | Delegates to `Vec::index`. |
-/// | [`IndexMut`](#impl-IndexMut) | None | Delegates to `Vec::index_mut`. |
-/// | [`IntoIterator`](#impl-IntoIterator) | None | Implements for `&Self`, `&mut Self`, and `Self`. |
-/// | [`AsRef<Self>`](#impl-AsRef<Self>) | None | Returns `&Self`. |
-/// | [`AsMut<Self>`](#impl-AsMut<Self>) | None | Returns `&mut Self`. |
-/// | [`AsRef<Vec<Enum>>`](#impl-AsRef<Vec>) | None | Delegates to `Vec`. |
-/// | [`AsMut<Vec<Enum>>`](#impl-AsMut<Vec>) | None | Delegates to `Vec`. |
-/// | [`AsRef<[Enum]>`](#impl-AsRef<Slice>) | None | Delegates to `Vec`. |
-/// | [`AsMut<[Enum]>`](#impl-AsMut<Slice>) | None | Delegates to `Vec`. |
-/// | [`From<Vec<Enum>>`](#impl-From<Vec>) | `Default` | Initializes other fields with `Default::default()`. |
-/// | [`FromIterator<Enum>`](#impl-FromIterator) | `Default` | Initializes other fields with `Default::default()`. |
-/// | [`From<&[Enum]>`](#impl-From<Slice>) | `Clone`, `Default` | Initializes other fields with `Default::default()`. |
-/// | [`From<&mut [Enum]>`](#impl-From<MutSlice>) | `Clone`, `Default` | Initializes other fields with `Default::default()`. |
-/// | [`Extend<Enum>`](#impl-Extend) | `Clone` | Delegates to `Vec::extend`. |
 ///
 #[derive(Debug, Clone)]
 pub(crate) struct VecWrapper {
@@ -163,9 +89,10 @@ impl VecWrapper {
         generics: &Generics,
         derive_attr: &[Attribute],
     ) -> Self {
+        let stripped_attrs = strip_copy(derive_attr);
         let wrapper: ItemStruct = parse_quote! {
             #[derive(Default)]
-            #(#derive_attr)*
+            #(#stripped_attrs)*
             #visibility struct #ident #generics {
                 inner: std::vec::Vec< #enum_ident #generics >,
             }
@@ -182,22 +109,25 @@ impl VecWrapper {
 
     /// Generates the complete `TokenStream` for the wrapper struct and its implementations.
     pub(crate) fn to_token_stream(&self, nodyn: &NodynEnum) -> TokenStream {
-        // if self.vec_field.is_none() {
-        //     return TokenStream::new();
-        // }
         let wrapper_struct = self.struct_tokens(nodyn);
-        let general_impl = self.impl_tokens(nodyn);
-        let trait_impls = &self.traits_tokens(nodyn);
-        let clone_impls = &self.with_clone_tokens(nodyn);
-        let clone_default_impls = &self.with_clone_and_default_tokens(nodyn);
-        let default_impls = &self.with_default_tokens(nodyn);
+        let impls = self.impl_tokens(nodyn);
+        let traits = &self.traits_tokens(nodyn);
+        let clone = &self.with_clone_tokens(nodyn);
+        let clone_and_default = &self.with_clone_and_default_tokens(nodyn);
+        let default = &self.with_default_tokens(nodyn);
+        let partial_ord = &self.with_partial_ord_tokens(nodyn);
+        let ord = &self.with_ord_tokens(nodyn);
+        let copy = &self.with_copy_tokens(nodyn);
         quote! {
             #wrapper_struct
-            #general_impl
-            #trait_impls
-            #default_impls
-            #clone_impls
-            #clone_default_impls
+            #impls
+            #traits
+            #default
+            #clone
+            #clone_and_default
+            #partial_ord
+            #ord
+            #copy
         }
     }
 
@@ -236,15 +166,15 @@ impl VecWrapper {
         let ident = &self.definition.ident;
         let generics = self.generics_tokens(nodyn);
         let where_clause = self.where_tokens(nodyn);
-        let standard_methods = &self.delegated_methods_tokens(nodyn);
+        let delegated_methods = &self.delegated_methods_tokens(nodyn);
         let modified_methods = &self.modified_methods_tokens(nodyn);
         let partial_eq_methods = &self.partial_eq_methods_tokens();
         let field = &self.vec_field;
-        let variant_methods = nodyn.to_vec_methods(field);
+        let variant_methods = nodyn.variant_vec_tokens(field);
 
         quote! {
             impl #generics #ident #generics #where_clause {
-                #standard_methods
+                #delegated_methods
                 #modified_methods
                 #partial_eq_methods
                 #variant_methods
@@ -297,14 +227,14 @@ impl VecWrapper {
     /// - [`fill_with`][std::vec::Vec::fill_with]
     /// - [`rotate_left`][std::vec::Vec::rotate_left]
     /// - [`rotate_right`][std::vec::Vec::rotate_right]
-    ///
-    //
-    // TODO:
-    //   pub fn is_sorted(&self) -> bool where T: PartialOrd,
-    //   pub fn sort(&mut self) where T: Ord,
-    //   fn sort_unstable(&mut self) where T: Ord,
-    //   fn copy_from_slice(&mut self, src: &[T]) where T: Copy,
-    //   fn copy_within<R>(&mut self, src: R, dest: usize) where R: RangeBounds<usize>, T: Copy,
+    /// - [`is_sorted_by`][std::vec::Vec::is_sorted_by]
+    /// - [`is_sorted_by_key`][std::vec::Vec::is_sorted_by_key]
+    /// - [`sort_by`][std::vec::Vec::sort_by]
+    /// - [`sort_by_key`][std::vec::Vec::sort_by_key]
+    /// - [`sort_unstable_by`][std::vec::Vec::sort_unstable_by]
+    /// - [`sort_unstable_by_key`][std::vec::Vec::sort_unstable_by_key]
+    /// - [`binary_search_by`][std::vec::Vec::binary_search_by]
+    /// - [`binary_search_by_key`][std::vec::Vec::binary_search_by_key]
     #[allow(clippy::too_many_lines)]
     fn delegated_methods_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
         let field = &self.vec_field;
@@ -314,6 +244,7 @@ impl VecWrapper {
         let nt = &nodyn.generics.new_types(2);
         let new_type = &nt[0];
         let new_type2 = &nt[1];
+        let lt = &nodyn.generics.new_lifetime();
 
         quote! {
             /// Returns the total number of elements the vector can hold without reallocating.
@@ -595,6 +526,67 @@ impl VecWrapper {
             #visibility fn rotate_right(&mut self, k: usize) {
                 self.#field.rotate_right(k)
             }
+
+            /// Checks if the elements are sorted using the given comparator function.
+            /// See [`std::vec::Vec::is_sorted_by`].
+            #visibility fn is_sorted_by<#lt, #new_type>(&#lt self, f: #new_type) -> bool
+            where #new_type: ::core::ops::FnMut(&#lt #enum_ident #enum_generics, &#lt #enum_ident #enum_generics) -> bool, {
+                self.#field.is_sorted_by(f)
+            }
+
+            /// Checks if the elements are sorted using the given key extraction function.
+            /// See [`std::vec::Vec::is_sorted_by_key`].
+            #visibility fn is_sorted_by_key<#lt, #new_type, #new_type2>(&#lt self, f: #new_type) -> bool
+            where #new_type: ::core::ops::FnMut(&#lt #enum_ident #enum_generics) -> #new_type2,
+                  #new_type2: ::core::cmp::PartialOrd {
+                self.#field.is_sorted_by_key(f)
+            }
+
+            /// Sorts the slice with a comparison function, preserving initial order of equal elements.
+            /// See [`std::vec::Vec::sort_by`].
+            #visibility fn sort_by<#new_type>(&mut self, f: #new_type)
+            where #new_type: ::core::ops::FnMut(&#enum_ident #enum_generics, &#enum_ident #enum_generics) -> ::core::cmp::Ordering, {
+                self.#field.sort_by(f);
+            }
+
+            /// Sorts the slice with a key extraction function, preserving initial order of equal elements.
+            /// See [`std::vec::Vec::sort_by_key`].
+            #visibility fn sort_by_key<#new_type, #new_type2>(&mut self, f: #new_type)
+            where #new_type: ::core::ops::FnMut(&#enum_ident #enum_generics) -> #new_type2,
+                  #new_type2: ::core::cmp::Ord {
+                self.#field.sort_by_key(f);
+            }
+
+            /// Sorts the slice with a comparison function, without preserving the initial order of equal elements.
+            /// See [`std::vec::Vec::sort_unstable_by`].
+            #visibility fn sort_unstable_by<#new_type>(&mut self, f: #new_type)
+            where #new_type: ::core::ops::FnMut(&#enum_ident #enum_generics, &#enum_ident #enum_generics) -> ::core::cmp::Ordering, {
+                self.#field.sort_unstable_by(f);
+            }
+
+            /// Sorts the slice with a key extraction function, without preserving the initial order of equal elements.
+            /// See [`std::vec::Vec::sort_unstable_by_key`].
+            #visibility fn sort_unstable_by_key<#new_type, #new_type2>(&mut self, f: #new_type)
+            where #new_type: ::core::ops::FnMut(&#enum_ident #enum_generics) -> #new_type2,
+                  #new_type2: ::core::cmp::Ord {
+                self.#field.sort_unstable_by_key(f);
+            }
+
+            /// Binary searches this slice with a comparator function.
+            /// See [`std::vec::Vec::binary_search_by`].
+            #visibility fn binary_search_by<#lt, #new_type>(&#lt self, f: #new_type) -> ::core::result::Result<usize, usize>
+            where #new_type: ::core::ops::FnMut(&#lt #enum_ident #enum_generics) -> ::core::cmp::Ordering, {
+                self.#field.binary_search_by(f)
+            }
+
+            /// Binary searches this slice with a key extraction function.
+            /// See [`std::vec::Vec::binary_search_by_key`].
+            #visibility fn binary_search_by_key<#lt, #new_type, #new_type2>(&#lt self, b: &#new_type2, f: #new_type) -> ::core::result::Result<usize, usize>
+            where #new_type: ::core::ops::FnMut(&#lt #enum_ident #enum_generics) -> #new_type2,
+                  #new_type2: ::core::cmp::Ord {
+                self.#field.binary_search_by_key(b, f)
+            }
+
         }
     }
 
@@ -787,7 +779,7 @@ impl VecWrapper {
                 impl #generics ::core::convert::From<::std::vec::Vec<#ty>> for #ident #generics #where_clause {
                     fn from(v: ::std::vec::Vec<#ty>) -> Self {
                         Self {
-                            #field: v.into_iter().map(::core::convert::Into::into).collect(),
+                            #field: v.into_iter().map(#enum_ident::from).collect(),
                             ..::core::default::Default::default()
                         }
                     }
@@ -875,7 +867,7 @@ impl VecWrapper {
             quote!{
                 impl #generics ::core::iter::Extend<#ty> for #ident #generics #where_clause {
                     fn extend<#new_type: ::core::iter::IntoIterator<Item = #ty>>(&mut self, iter: #new_type) {
-                        self.#field.extend(iter.into_iter().map(::core::convert::Into::into))
+                        self.#field.extend(iter.into_iter().map(#enum_ident::from))
                     }
                 }
             }
@@ -944,16 +936,31 @@ impl VecWrapper {
         } else {
             (quote! { #ident }, quote! { #enum_ident })
         };
-        quote! {
-            #[macro_export]
-            macro_rules! #snake_ident {
-                () => ( #ident::new() );
-                ($elem:expr; $n:expr) => (
-                    #macro_vec{ #field: ::std::vec![#macro_enum::from($elem);$n], .. ::core::default::Default::default() }
-                );
-                ($($x:expr),+ $(,)?) => (
-                    #macro_vec{ #field: ::std::vec![$(#macro_enum::from($x)),+], .. ::core::default::Default::default() }
-                );
+        if self.is_custom {
+            quote! {
+                #[macro_export]
+                macro_rules! #snake_ident {
+                    () => ( #ident::new() );
+                    ($elem:expr; $n:expr) => (
+                        #macro_vec{ #field: ::std::vec![#macro_enum::from($elem);$n], .. ::core::default::Default::default() }
+                    );
+                    ($($x:expr),+ $(,)?) => (
+                        #macro_vec{ #field: ::std::vec![$(#macro_enum::from($x)),+], .. ::core::default::Default::default() }
+                    );
+                }
+            }
+        } else {
+            quote! {
+                #[macro_export]
+                macro_rules! #snake_ident {
+                    () => ( #ident::new() );
+                    ($elem:expr; $n:expr) => (
+                        #macro_vec{ #field: ::std::vec![#macro_enum::from($elem);$n] }
+                    );
+                    ($($x:expr),+ $(,)?) => (
+                        #macro_vec{ #field: ::std::vec![$(#macro_enum::from($x)),+] }
+                    );
+                }
             }
         }
     }
@@ -981,7 +988,7 @@ impl VecWrapper {
                 impl #generics ::core::convert::From<&[#ty]> for #ident #generics #where_clause {
                     fn from(s: &[#ty]) -> #ident #generics {
                         Self {
-                           #field: s.iter().cloned().map(::core::convert::Into::into).collect(),
+                           #field: s.iter().cloned().map(#enum_ident::from).collect(),
                             ..::core::default::Default::default()
                         }
                     }
@@ -990,7 +997,7 @@ impl VecWrapper {
                 impl #generics ::core::convert::From<&mut [#ty]> for #ident #generics #where_clause {
                     fn from(s: &mut [#ty]) -> #ident #generics {
                         Self {
-                           #field: s.iter().cloned().map(::core::convert::Into::into).collect(),
+                           #field: s.iter().cloned().map(#enum_ident::from).collect(),
                             ..::core::default::Default::default()
                         }
                     }
@@ -1018,6 +1025,110 @@ impl VecWrapper {
             }
 
             #(#variants)*
+        }
+    }
+
+    /// Generates methods that require the enum to have `#[derive(PartialOrd)]`;
+    /// - [`is_sorted`][std::vec::Vec::is_sorted]
+    //
+    //   fn copy_from_slice(&mut self, src: &[T]) where T: Copy,
+    //   fn copy_within<R>(&mut self, src: R, dest: usize) where R: RangeBounds<usize>, T: Copy,
+    fn with_partial_ord_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
+        if !self.derived_traits.contains(&"PartialOrd".to_string()) {
+            return TokenStream::new();
+        }
+        let field = &self.vec_field;
+        let ident = &self.definition.ident;
+        let generics = self.generics_tokens(nodyn);
+        let where_clause = self.where_tokens(nodyn);
+        let visibility = &self.definition.vis;
+
+        quote! {
+            /// Checks if the elements of this slice are sorted.
+            /// See [`std::vec::Vec::is_sorted`].
+            impl #generics #ident #generics #where_clause {
+                #visibility fn is_sorted(&self) -> bool {
+                    self.#field.is_sorted()
+                }
+            }
+        }
+    }
+
+    /// Generates methods that require the enum to have `#[derive(Ord)]`;
+    ///
+    /// - [`sort`][std::vec::Vec::sort]
+    /// - [`sort_unstable`][std::vec::Vec::sort_unstable]
+    /// - [`binary_search`][std::vec::Vec::binary_search]
+    fn with_ord_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
+        if !self.derived_traits.contains(&"Ord".to_string()) {
+            return TokenStream::new();
+        }
+        let field = &self.vec_field;
+        let ident = &self.definition.ident;
+        let generics = self.generics_tokens(nodyn);
+        let where_clause = self.where_tokens(nodyn);
+        let visibility = &self.definition.vis;
+        let enum_ident = &nodyn.ident;
+        let enum_generics = nodyn.to_generics();
+
+        quote! {
+            /// Sorts the slice, preserving initial order of equal elements.
+            /// See [`std::vec::Vec::sort`].
+            impl #generics #ident #generics #where_clause {
+                #visibility fn sort(&mut self) {
+                    self.#field.sort();
+                }
+            }
+
+            /// Sorts the slice without preserving the initial order of equal elements.
+            /// See [`std::vec::Vec::sort_unstable`].
+            impl #generics #ident #generics #where_clause {
+                #visibility fn sort_unstable(&mut self) {
+                    self.#field.sort_unstable();
+                }
+            }
+
+            /// Binary searches this slice for a given element.
+            /// See [`std::vec::Vec::binary_search`].
+            impl #generics #ident #generics #where_clause {
+                #visibility fn binary_search(&mut self, x: &#enum_ident #enum_generics) -> ::core::result::Result<usize, usize> {
+                    self.#field.binary_search(x)
+                }
+            }
+        }
+    }
+
+    /// Generates methods that require the enum to have `#[derive(Copy)]`;
+    /// - [`copy_from_slice`][std::vec::Vec::copy_from_slice]
+    /// - [`copy_within`][std::vec::Vec::copy_within]
+    fn with_copy_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
+        if !self.derived_traits.contains(&"Copy".to_string()) {
+            return TokenStream::new();
+        }
+        let field = &self.vec_field;
+        let ident = &self.definition.ident;
+        let generics = self.generics_tokens(nodyn);
+        let where_clause = self.where_tokens(nodyn);
+        let visibility = &self.definition.vis;
+        let enum_ident = &nodyn.ident;
+        let enum_generics = nodyn.to_generics();
+        let new_type = &nodyn.generics.new_type();
+
+        quote! {
+            impl #generics #ident #generics #where_clause {
+                /// Copies all elements from src into self, using a memcpy.
+                /// See [`std::vec::Vec::copy_from_slice`].
+                #visibility fn copy_from_slice(&mut self, src: &[#enum_ident #enum_generics]) {
+                    self.#field.copy_from_slice(src);
+                }
+
+                /// Copies elements from one part of the slice to another part of itself, using a memmove.
+                #visibility fn copy_within<#new_type>(&mut self, src: # new_type, dest: usize)
+                where
+                    #new_type: ::core::ops::RangeBounds<usize>, {
+                       self.#field.copy_within(src, dest);
+                }
+            }
         }
     }
 
@@ -1080,4 +1191,33 @@ impl VecWrapper {
             )
         }
     }
+}
+
+fn strip_copy(attrs: &[Attribute]) -> Vec<Attribute> {
+    let parser = Punctuated::<Ident, Token![,]>::parse_terminated;
+    attrs
+        .iter()
+        .map(|attr| {
+            if let Meta::List(list) = &attr.meta {
+                if list.path.is_ident("derive") {
+                    let ids: Vec<Ident> = parser
+                        .parse(list.tokens.clone().into())
+                        .ok()
+                        .map(|idents| {
+                            idents
+                                .into_iter()
+                                .filter_map(|id| if id == "Copy" { None } else { Some(id) })
+                                .collect()
+                        })
+                        .unwrap();
+                    let a: Attribute = parse_quote! { #[derive( #(#ids ,)* )]};
+                    a
+                } else {
+                    attr.clone()
+                }
+            } else {
+                attr.clone()
+            }
+        })
+        .collect()
 }

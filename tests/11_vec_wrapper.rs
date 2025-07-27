@@ -1,9 +1,8 @@
 nodyn::nodyn! {
-    #[derive(Debug, Clone, PartialEq, PartialOrd)]
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
     pub enum Value<'a> {
         i32,
         bool,
-        f64,
         &'a str,
     }
     vec Values;
@@ -18,15 +17,18 @@ fn main() {
     assert_eq!(values.last_str_ref(), Some(&"omega"));
     assert_eq!(values.last_i32(), Some(&5));
     assert!(values.any_i32());
-    assert!(!values.any_f64());
-    values.extend(vec![4.3, 1.61, 7345.2]);
-    assert!(values.any_f64());
+    values.extend(vec![4, 1, 7345]);
+    assert_eq!(values.len(), 8);
 
     let indexes = values
         .enumerate_str_ref()
         .map(|(i, _)| i)
         .collect::<Vec<usize>>();
     assert_eq!(indexes.len(), 3);
+    values.sort();
+    let search = values.binary_search(&Value::from(7345));
+    assert_eq!(search, Ok(4));
+
     let bools = values![true, true, false, true, true];
     assert!(bools.all_bool());
     assert_eq!(bools.count_bool(), 5);

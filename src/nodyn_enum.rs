@@ -510,7 +510,7 @@ impl NodynEnum {
     }
 
     /// Generates vector accessor methods for a given `Vec` field in a vec wrapper.
-    pub(crate) fn to_vec_methods(&self, vec_field: &Ident) -> TokenStream {
+    pub(crate) fn variant_vec_tokens(&self, vec_field: &Ident) -> TokenStream {
         let methods = self
             .variants
             .iter()
@@ -530,28 +530,28 @@ impl NodynEnum {
         if self.optional_impl.none() {
             // depreciated feature flags only if no features are set
             #[cfg(feature = "try_into")]
-            #[deprecated(
-                since = "0.2.0",
-                note = "Use `impl TryInto` in the macro invocation instead, as this feature is outdated and will be removed in version 0.3.0"
-            )]
+            eprintln!(
+                "Warning: The `try_into` cargo feature is deprecated. Use `impl TryInto` in the nodyn! macro."
+            );
+            #[cfg(feature = "introspection")]
+            eprintln!(
+                "Warning: The `introspection` cargo feature is deprecated. Use `impl introspection` in the nodyn! macro."
+            );
+            #[cfg(feature = "is_as")]
+            eprintln!(
+                "Warning: The `is_as` cargo feature is deprecated. Use `impl is_as` in the nodyn! macro."
+            );
+            #[cfg(feature = "try_into")]
             let try_into = self.to_try_from_impls();
             #[cfg(not(feature = "try_into"))]
             let try_into = Vec::<proc_macro2::TokenStream>::new();
 
             #[cfg(feature = "introspection")]
-            #[deprecated(
-                since = "0.2.0",
-                note = "Use `impl introspection` in the macro invocation instead, as this feature is outdated and will be removed in version 0.3.0"
-            )]
             let type_fns = self.to_introspection_methods();
             #[cfg(not(feature = "introspection"))]
             let type_fns = proc_macro2::TokenStream::new();
 
             #[cfg(feature = "is_as")]
-            #[deprecated(
-                since = "0.2.0",
-                note = "Use `impl is_as` in the macro invocation instead, as this feature is outdated and will be removed in version 0.3.0"
-            )]
             let is_as_fn = self.to_is_as_methods().unwrap();
             #[cfg(not(feature = "is_as"))]
             let is_as_fn = proc_macro2::TokenStream::new();
