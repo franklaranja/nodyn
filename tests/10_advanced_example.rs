@@ -34,7 +34,7 @@ nodyn::nodyn! {
         JsonArray,
     }
 
-    impl vec;
+    vec;
 
     impl fmt::Display {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;

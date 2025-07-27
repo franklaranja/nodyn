@@ -6,7 +6,7 @@ nodyn::nodyn! {
         f64,
         &'a str,
     }
-    impl vec Values;
+    vec Values;
 }
 
 fn main() {

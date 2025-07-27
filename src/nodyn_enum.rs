@@ -79,24 +79,7 @@ impl Parse for NodynEnum {
         while !input.is_empty() {
             if input.peek(Token![impl]) {
                 input.parse::<syn::token::Impl>()?;
-                if input.peek(crate::keyword::vec) {
-                    input.parse::<crate::keyword::vec>()?;
-                    let vec_ident = if input.peek(Ident) {
-                        input.parse::<Ident>()?
-                    } else {
-                        format_ident!("{}Vec", ident)
-                    };
-                    collection_structs.push(VecWrapper::standard_vec_wrapper(
-                        &vec_ident,
-                        &visibility,
-                        &ident,
-                        &generics,
-                        &derive_attrs,
-                    ));
-                    if input.peek(Token![;]) {
-                        input.parse::<syn::token::Semi>()?;
-                    }
-                } else if input.peek(keyword::TryInto)
+                if input.peek(keyword::TryInto)
                     || input.peek(keyword::is_as)
                     || input.peek(keyword::introspection)
                 {
@@ -105,6 +88,23 @@ impl Parse for NodynEnum {
                     trait_blocks.push(input.parse::<TraitImpl>()?);
                 } else {
                     impl_blocks.push(input.parse::<MethodImpl>()?);
+                }
+            } else if input.peek(crate::keyword::vec) {
+                input.parse::<crate::keyword::vec>()?;
+                let vec_ident = if input.peek(Ident) {
+                    input.parse::<Ident>()?
+                } else {
+                    format_ident!("{}Vec", ident)
+                };
+                collection_structs.push(VecWrapper::standard_vec_wrapper(
+                    &vec_ident,
+                    &visibility,
+                    &ident,
+                    &generics,
+                    &derive_attrs,
+                ));
+                if input.peek(Token![;]) {
+                    input.parse::<syn::token::Semi>()?;
                 }
             } else if let Ok(wrapper_struct) = input.parse::<VecWrapper>() {
                 collection_structs.push(wrapper_struct);
@@ -642,7 +642,7 @@ mod tests {
             pub enum MyEnum {
                 Number(i32),
             }
-            impl vec MyEnumVec;
+            vec MyEnumVec;
             ",
         )
         .unwrap();

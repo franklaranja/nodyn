@@ -140,14 +140,15 @@
 //!         &'a str,                // StrRef
 //!         Vec<String>,            // VecString
 //!     }
+//!     vec;
 //! }
 //!
-//! let values = vec![
-//!     ComplexEnum::from(42i32),
-//!     ComplexEnum::from("hello"),
-//!     ComplexEnum::from((1u8, 2u16)),
-//!     ComplexEnum::from([true, false]),
-//!     ComplexEnum::from(vec!["a".to_string()]),
+//! let values = complex_enum_vec![
+//!     42i32,
+//!     "hello",
+//!     (1u8, 2u16),
+//!     [true, false],
+//!     vec!["a".to_string()],
 //! ];
 //! ```
 //!
@@ -175,9 +176,9 @@
 //!         fn method_name(&self, args) -> ReturnType;
 //!     }]
 //!
-//!     [impl vec [VecWrapperName]]
+//!     [vec [VecName]]
 //!
-//!     [ #[vec_wrapper] | #[vec_wrapper(field)]
+//!     [ #[vec] | #[vec(field)]
 //!       [ #[attribute] ]
 //!       [pub] struct CustomValues {
 //!           [field: Type,]
@@ -315,13 +316,11 @@
 //!     impl Display {
 //!         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
 //!     }
+//!
+//!     vec Displayables;
 //! }
 //!
-//! let values: Vec<Displayable> = vec![
-//!     42.into(),
-//!     "hello".to_string().into(),
-//!     3.14.into(),
-//! ];
+//! let values = displayables![42, "hello".to_string(), 3.14];
 //!
 //! for val in values {
 //!     println!("{}", val); // Uses delegated Display implementation
@@ -344,7 +343,7 @@
 //!         String,
 //!         f64,
 //!     }
-//!     impl vec;
+//!     vec;
 //! }
 //!
 //! let mut values = ValueVec::default();
@@ -356,8 +355,12 @@
 //!
 //! ### Simple Wrappers
 //!
-//! Using `impl vec` generates a wrapper named `<EnumName>Vec` with the same derive attributes as
-//! the enum, plus `Default`. You can specify a custom name:
+//! Using `impl vec` generates a wrapper named after the enum with the extension Vec.
+//! The generated wrapper has the same derive attributes as
+//! the enum, plus `Default`. The visibility of the wrapper and
+//! its methods is the same too.
+//!
+//! You can specify a name for the wrapper:
 //!
 //! ```rust
 //! nodyn::nodyn! {
@@ -367,7 +370,8 @@
 //!         String,
 //!         f64,
 //!     }
-//!     impl vec Values;
+//!
+//!     vec Values;
 //! }
 //! ```
 //!
@@ -378,10 +382,13 @@
 //! does not know where it is invoked, you have to tell it the
 //! full module path including the crate name, so the generated
 //! macro works correctly. If you don't specify the module path
-//! it is assumed the vec wrapper and enum are in the lical scope.
+//! it is assumed the vec wrapper and enum are in the local scope.
 //!
 //! The macro works like `vec!` but accepts any value within your
 //! enum.
+//!
+//! The macro requires that the wrapper has the `#[derive('Default)]`
+//! attribute (the standard vec wrapper always has this).
 //!
 //! #### Example
 //!
@@ -396,7 +403,7 @@
 //!         f64,
 //!     }
 //!
-//!     impl vec Values;
+//!     vec Values;
 //! }
 //!
 //! // elsewhere after importing values, etc:
@@ -406,10 +413,13 @@
 //! ### Custom Wrappers
 //!
 //! Define a custom wrapper struct with additional fields using the
-//! `#[vec_wrapper]` or `#[vec_wrapper(field_name)]` attribute. Without
+//! `#[vec]` or `#[vec(field_name)]` attribute. Without
 //! a field name 'inner' is used. `nodyn!` adds the field. Unlike the
 //! standard vec wrapper, derive arguments are not copied from the enum.
 //! `nodyn!` does implement neither `Deref` nor `DerefMut`, so you can!
+//!
+//! I recommend you put a `#[derive('Default)]` on your custom vec wrapper
+//! so nodyn can generate the macro and implement the From trait.
 //!
 //! ```rust
 //! nodyn::nodyn! {
@@ -419,7 +429,7 @@
 //!         String,
 //!     }
 //!
-//!     #[vec_wrapper(inner_vec)]
+//!     #[vec(inner_vec)]
 //!     #[derive(Debug, Clone)]
 //!     pub struct CustomValues {
 //!         metadata: String,
@@ -432,6 +442,7 @@
 //! };
 //! values.push(42);
 //! assert_eq!(values.metadata, "example");
+//! assert_eq!(values.len(), 1);
 //! ```
 //!
 //! ### implemented methods and traits
@@ -593,10 +604,13 @@
 //!         String,
 //!         JsonArray,
 //!     }
-//!     impl vec;
+//!     
+//!     vec;
+//!
 //!     impl fmt::Display {
 //!         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
 //!     }
+//!
 //!     impl {
 //!         pub const fn json_type_name(&self) -> &'static str {
 //!             match self {

@@ -96,7 +96,7 @@ pub(crate) struct VecWrapper {
     /// The struct definition, including fields and attributes.
     pub(crate) definition: ItemStruct,
     /// The identifier of the `Vec` field (e.g., `inner` or `inner_vec`).
-    pub(crate) vec_field: Option<Ident>,
+    pub(crate) vec_field: Ident,
     /// Whether the struct is custom (defined with `#[vec_wrapper]`).
     pub(crate) is_custom: bool,
     /// Derived traits (e.g., `Default`, `Clone`, `PartialEq`).
@@ -113,7 +113,7 @@ impl Parse for VecWrapper {
             ));
         }
         let mut attrs = Vec::new();
-        let vec_wrapper = Ident::new("vec_wrapper", Span::call_site());
+        let vec_wrapper = Ident::new("vec", Span::call_site());
         let mut vec_field = None;
         for attribute in wrapper.attrs {
             if let Meta::Path(path) = &attribute.meta {
@@ -139,12 +139,19 @@ impl Parse for VecWrapper {
         let traits = Self::extract_traits(&attrs);
         wrapper.attrs = attrs;
 
-        Ok(Self {
-            definition: wrapper,
-            vec_field,
-            is_custom: true,
-            derived_traits: traits,
-        })
+        if let Some(vec_field) = vec_field {
+            Ok(Self {
+                definition: wrapper,
+                vec_field,
+                is_custom: true,
+                derived_traits: traits,
+            })
+        } else {
+            Err(syn::Error::new(
+                wrapper.span(),
+                "Struct is missing #[vec] atrribute",
+            ))
+        }
     }
 }
 
@@ -167,7 +174,7 @@ impl VecWrapper {
         traits.push("Default".to_string());
         Self {
             definition: wrapper,
-            vec_field: Some(Ident::new("inner", Span::call_site())),
+            vec_field: Ident::new("inner", Span::call_site()),
             is_custom: false,
             derived_traits: traits,
         }
@@ -175,15 +182,15 @@ impl VecWrapper {
 
     /// Generates the complete `TokenStream` for the wrapper struct and its implementations.
     pub(crate) fn to_token_stream(&self, nodyn: &NodynEnum) -> TokenStream {
-        if self.vec_field.is_none() {
-            return TokenStream::new();
-        }
-        let wrapper_struct = self.to_struct(nodyn);
-        let general_impl = self.to_general_impl(nodyn);
-        let trait_impls = &self.to_trait_impls(nodyn);
-        let clone_impls = &self.to_impl_with_clone(nodyn);
-        let clone_default_impls = &self.to_impl_with_clone_default(nodyn);
-        let default_impls = &self.to_impl_with_default(nodyn);
+        // if self.vec_field.is_none() {
+        //     return TokenStream::new();
+        // }
+        let wrapper_struct = self.struct_tokens(nodyn);
+        let general_impl = self.impl_tokens(nodyn);
+        let trait_impls = &self.traits_tokens(nodyn);
+        let clone_impls = &self.with_clone_tokens(nodyn);
+        let clone_default_impls = &self.with_clone_and_default_tokens(nodyn);
+        let default_impls = &self.with_default_tokens(nodyn);
         quote! {
             #wrapper_struct
             #general_impl
@@ -195,10 +202,7 @@ impl VecWrapper {
     }
 
     /// Generates the `TokenStream` for the wrapper struct definition.
-    fn to_struct(&self, nodyn: &NodynEnum) -> TokenStream {
-        if self.vec_field.is_none() {
-            return TokenStream::new();
-        }
+    fn struct_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
         if self.is_custom {
             let enum_ident = &nodyn.ident;
             let enum_generics = nodyn.to_generics();
@@ -212,8 +216,7 @@ impl VecWrapper {
             } else {
                 Vec::new()
             };
-            let default_field = Ident::new("inner", Span::call_site());
-            let field = self.vec_field.as_ref().unwrap_or(&default_field);
+            let field = &self.vec_field;
             let attrs = &self.definition.attrs;
             quote! {
                 #(#attrs)*
@@ -229,17 +232,14 @@ impl VecWrapper {
     }
 
     /// Generates the general implementation block, including standard methods and variant-specific methods.
-    fn to_general_impl(&self, nodyn: &NodynEnum) -> TokenStream {
-        if self.vec_field.is_none() {
-            return TokenStream::new();
-        }
+    fn impl_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
         let ident = &self.definition.ident;
-        let generics = self.to_generics(nodyn);
-        let where_clause = self.to_where(nodyn);
-        let standard_methods = &self.to_standard_methods(nodyn);
-        let modified_methods = &self.to_modified_methods(nodyn);
-        let partial_eq_methods = &self.to_partial_eq_methods();
-        let field = self.vec_field.as_ref().unwrap();
+        let generics = self.generics_tokens(nodyn);
+        let where_clause = self.where_tokens(nodyn);
+        let standard_methods = &self.delegated_methods_tokens(nodyn);
+        let modified_methods = &self.modified_methods_tokens(nodyn);
+        let partial_eq_methods = &self.partial_eq_methods_tokens();
+        let field = &self.vec_field;
         let variant_methods = nodyn.to_vec_methods(field);
 
         quote! {
@@ -306,11 +306,8 @@ impl VecWrapper {
     //   fn copy_from_slice(&mut self, src: &[T]) where T: Copy,
     //   fn copy_within<R>(&mut self, src: R, dest: usize) where R: RangeBounds<usize>, T: Copy,
     #[allow(clippy::too_many_lines)]
-    fn to_standard_methods(&self, nodyn: &NodynEnum) -> TokenStream {
-        if self.vec_field.is_none() {
-            return TokenStream::new();
-        }
-        let field = self.vec_field.as_ref().unwrap();
+    fn delegated_methods_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
+        let field = &self.vec_field;
         let visibility = &self.definition.vis;
         let enum_ident = &nodyn.ident;
         let enum_generics = nodyn.to_generics();
@@ -605,11 +602,8 @@ impl VecWrapper {
     ///
     /// - [`insert`][std::vec::Vec::insert]: Accepts `Into<Enum>` for the element.
     /// - [`push`][std::vec::Vec::push]: Accepts `Into<Enum>` for the value.
-    fn to_modified_methods(&self, nodyn: &NodynEnum) -> TokenStream {
-        if self.vec_field.is_none() {
-            return TokenStream::new();
-        }
-        let field = self.vec_field.as_ref().unwrap();
+    fn modified_methods_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
+        let field = &self.vec_field;
         let visibility = &self.definition.vis;
         let enum_ident = &nodyn.ident;
         let enum_generics = nodyn.to_generics();
@@ -635,11 +629,11 @@ impl VecWrapper {
     /// Generates methods that require the `PartialEq` trait.
     ///
     /// - [`dedup`][std::vec::Vec::dedup]: Removes consecutive duplicate elements.
-    fn to_partial_eq_methods(&self) -> TokenStream {
-        if self.vec_field.is_none() || !self.derived_traits.contains(&"PartialEq".to_string()) {
+    fn partial_eq_methods_tokens(&self) -> TokenStream {
+        if !self.derived_traits.contains(&"PartialEq".to_string()) {
             return TokenStream::new();
         }
-        let field = self.vec_field.as_ref().unwrap();
+        let field = &self.vec_field;
         let visibility = &self.definition.vis;
 
         quote! {
@@ -664,15 +658,12 @@ impl VecWrapper {
     /// - [`AsMut<Vec<Enum>>`][std::convert::AsMut]
     /// - [`AsRef<[Enum]>`][std::convert::AsRef]
     /// - [`AsMut<[Enum]>`][std::convert::AsMut]
-    fn to_trait_impls(&self, nodyn: &NodynEnum) -> TokenStream {
-        if self.vec_field.is_none() {
-            return TokenStream::new();
-        }
+    fn traits_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
         let ident = &self.definition.ident;
         let enum_ident = &nodyn.ident;
-        let field = self.vec_field.as_ref().unwrap();
-        let generics = self.to_generics(nodyn);
-        let where_clause = self.to_where(nodyn);
+        let field = &self.vec_field;
+        let generics = self.generics_tokens(nodyn);
+        let where_clause = self.where_tokens(nodyn);
         let enum_generics = nodyn.to_generics();
         let new_type = nodyn.generics.new_type();
         let index_g: GenericParam = parse_quote! {#new_type};
@@ -778,16 +769,16 @@ impl VecWrapper {
     /// - [`new`][std::vec::Vec::new]
     /// - [`with_capacity`][std::vec::Vec::with_capacity]
     /// - [`split_off`][std::vec::Vec::split_off]
-    fn to_impl_with_default(&self, nodyn: &NodynEnum) -> TokenStream {
-        if self.vec_field.is_none() || !self.derived_traits.contains(&"Default".to_string()) {
+    fn with_default_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
+        if !self.derived_traits.contains(&"Default".to_string()) {
             return TokenStream::new();
         }
-        let field = self.vec_field.as_ref().unwrap();
+        let field = &self.vec_field;
         let ident = &self.definition.ident;
         let enum_ident = &nodyn.ident;
         let visibility = &self.definition.vis;
-        let generics = self.to_generics(nodyn);
-        let where_clause = self.to_where(nodyn);
+        let generics = self.generics_tokens(nodyn);
+        let where_clause = self.where_tokens(nodyn);
         let enum_generics = nodyn.to_generics();
         let new_type = &nodyn.generics.new_type();
         let variants = nodyn.variants.iter().map(|variant| {
@@ -803,6 +794,8 @@ impl VecWrapper {
                 }
             }
         }).collect::<Vec<_>>();
+
+        let vec_macro = self.macro_tokens(nodyn);
 
         quote! {
             impl #generics ::core::convert::From<::std::vec::Vec<#enum_ident #enum_generics>> for #ident #generics #where_clause {
@@ -850,6 +843,8 @@ impl VecWrapper {
                     }
                 }
             }
+
+            #vec_macro
         }
     }
 
@@ -862,15 +857,15 @@ impl VecWrapper {
     /// - [`clone_from_slice`][std::vec::Vec::clone_from_slice]
     /// - [`to_vec`][std::vec::Vec::to_vec]
     /// - [`fill`][std::vec::Vec::fill]
-    fn to_impl_with_clone(&self, nodyn: &NodynEnum) -> TokenStream {
-        if self.vec_field.is_none() || !self.derived_traits.contains(&"Clone".to_string()) {
+    fn with_clone_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
+        if !self.derived_traits.contains(&"Clone".to_string()) {
             return TokenStream::new();
         }
-        let field = self.vec_field.as_ref().unwrap();
+        let field = &self.vec_field;
         let ident = &self.definition.ident;
         let visibility = &self.definition.vis;
-        let generics = self.to_generics(nodyn);
-        let where_clause = self.to_where(nodyn);
+        let generics = self.generics_tokens(nodyn);
+        let where_clause = self.where_tokens(nodyn);
         let enum_ident = &nodyn.ident;
         let enum_generics = nodyn.to_generics();
         let new_type = &nodyn.generics.new_type();
@@ -938,31 +933,48 @@ impl VecWrapper {
         }
     }
 
-    /// Generates traits and methods that require both `Clone` and `Default`.
-    ///
-    /// - [`From<&[Enum]>`][std::vec::Vec] also for each variant
-    /// - [`From<&mut [Enum]>`][std::vec::Vec] also for each variant
-    ///
-    /// - A macro named after the wrapper in snake case for convenient construction.
-    fn to_impl_with_clone_default(&self, nodyn: &NodynEnum) -> TokenStream {
-        if self.vec_field.is_none()
-            || !self.derived_traits.contains(&"Clone".to_string())
-            || !self.derived_traits.contains(&"Default".to_string())
-        {
-            return TokenStream::new();
-        }
-        let field = self.vec_field.as_ref().unwrap();
+    /// Generates the macto for constructing the `Vec` like `vec!`.
+    fn macro_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
         let ident = &self.definition.ident;
+        let field = &self.vec_field;
         let enum_ident = &nodyn.ident;
-        let generics = self.to_generics(nodyn);
-        let where_clause = self.to_where(nodyn);
-        let enum_generics = nodyn.to_generics();
         let snake_ident = Ident::new(&camel_to_snake(&ident.to_string()), ident.span());
         let (macro_vec, macro_enum) = if let Some(path) = &nodyn.module_path {
             (quote! { ::#path::#ident }, quote! { ::#path::#enum_ident })
         } else {
             (quote! { #ident }, quote! { #enum_ident })
         };
+        quote! {
+            #[macro_export]
+            macro_rules! #snake_ident {
+                () => ( #ident::new() );
+                ($elem:expr; $n:expr) => (
+                    #macro_vec{ #field: ::std::vec![#macro_enum::from($elem);$n], .. ::core::default::Default::default() }
+                );
+                ($($x:expr),+ $(,)?) => (
+                    #macro_vec{ #field: ::std::vec![$(#macro_enum::from($x)),+], .. ::core::default::Default::default() }
+                );
+            }
+        }
+    }
+
+    /// Generates traits and methods that require both `Clone` and `Default`.
+    ///
+    /// - [`From<&[Enum]>`][std::vec::Vec] also for each variant
+    /// - [`From<&mut [Enum]>`][std::vec::Vec] also for each variant
+    fn with_clone_and_default_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
+        if !self.derived_traits.contains(&"Clone".to_string())
+            || !self.derived_traits.contains(&"Default".to_string())
+        {
+            return TokenStream::new();
+        }
+        let field = &self.vec_field;
+        let ident = &self.definition.ident;
+        let enum_ident = &nodyn.ident;
+        let generics = self.generics_tokens(nodyn);
+        let where_clause = self.where_tokens(nodyn);
+        let enum_generics = nodyn.to_generics();
+
         let variants = nodyn.variants.iter().map(|variant| {
             let ty = &variant.ty;
             quote!{
@@ -1006,17 +1018,6 @@ impl VecWrapper {
             }
 
             #(#variants)*
-
-            #[macro_export]
-            macro_rules! #snake_ident {
-                () => ( #ident::new() );
-                ($elem:expr; $n:expr) => (
-                    #macro_vec::from( ::std::vec![#macro_enum::from($elem);$n])
-                );
-                ($($x:expr),+ $(,)?) => (
-                    #macro_vec::from( ::std::vec![$(#macro_enum::from($x)),+])
-                );
-            }
         }
     }
 
@@ -1045,7 +1046,7 @@ impl VecWrapper {
             .collect()
     }
 
-    fn to_generics(&self, nodyn: &NodynEnum) -> TokenStream {
+    fn generics_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
         if self.is_custom {
             nodyn.to_merged_generics(&self.definition.generics)
         } else {
@@ -1053,7 +1054,7 @@ impl VecWrapper {
         }
     }
 
-    fn to_where(&self, nodyn: &NodynEnum) -> TokenStream {
+    fn where_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
         if self.is_custom {
             nodyn.to_merged_where(&self.definition.generics)
         } else {
