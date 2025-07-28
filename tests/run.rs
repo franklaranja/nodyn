@@ -12,4 +12,19 @@ fn tests() {
     t.pass("tests/09_type_functions.rs");
     t.pass("tests/10_advanced_example.rs");
     t.pass("tests/11_vec_wrapper.rs");
+
+    t.pass("tests/enum/basic.rs");
+    t.pass("tests/enum/custom_variants.rs");
+    t.pass("tests/enum/from.rs");
+
+    t.pass("tests/features/is_as.rs");
+    t.pass("tests/features/introspection.rs");
+    t.pass("tests/features/into_attribute.rs");
+
+    t.pass("tests/vec_wrapper/standard.rs");
+    t.pass("tests/vec_wrapper/custom.rs");
+    t.pass("tests/vec_wrapper/macro.rs");
+
+    t.compile_fail("tests/errors/invalid_impl.rs");
+    t.compile_fail("tests/errors/double_type.rs");
 }

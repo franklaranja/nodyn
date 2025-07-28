@@ -1,0 +1,5 @@
+error: expected curly braces
+ --> tests/errors/invalid_impl.rs:7:24
+  |
+7 |     impl InvalidFeature; // Unknown feature
+  |                        ^
