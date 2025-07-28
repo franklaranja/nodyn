@@ -21,25 +21,9 @@ objects.
 > items are a fixed set of types that we know when our code is compiled."\
 > [The Rust Programming Language](http://doc.rust-lang.org/book/ch18-02-trait-objects.html)
 
-## Features
+## Quick Start
 
-- **Method and Trait Delegation**: Delegates methods or entire traits to the underlying types.
-- **Automatic Variant Creation**: Generates an enum with variants for specified types (e.g., `i32`, `String`, custom structs).
-- **Type Conversion**: Implements `From<T>` for each variant type and `TryFrom<Enum> for T` for non-reference types.
-- **Type Introspection**: Provides utility methods like `count()`, `types()`, and `type_name()` to query variant information.
-- **Custom Variant Names**: Allows overriding default variant names for clarity.
-- **Supported Types**: Handles path types, references, arrays and tuples.
-
-## Installation
-
-Add `nodyn` to your `Cargo.toml`:
-
-```toml
-[dependencies]
-nodyn = "0.1.0"
-```
-
-## Basic example
+Create a simple enum wrapper for `i32`, `String`, and `f64`:
 
 ```rust
 nodyn::nodyn! {
@@ -51,33 +35,79 @@ nodyn::nodyn! {
     }
 }
 
-fn main() {
-    // Store different types in the same collection
-    let values: Vec<Value> = vec![
-        42.into(),                    // i32 → Value::I32(42)
-        "hello".to_string().into(),   // String → Value::String("hello")
-        3.14.into(),                  // f64 → Value::F64(3.14)
-    ];
+let values: Vec<Value> = vec![
+    42.into(),                  // Converts i32 to Value::I32
+    "hello".to_string().into(), // Converts String to Value::String
+    3.14.into(),                // Converts f64 to Value::F64
+];
 
-    // Pattern match or use generated methods
-    for value in values {
-        match value {
-            Value::I32(n) => println!("Integer: {}", n),
-            Value::String(s) => println!("String: {}", s),
-            Value::F64(f) => println!("Float: {}", f),
-        }
+for value in values {
+    match value {
+        Value::I32(n) => println!("Integer: {}", n),
+        Value::String(s) => println!("String: {}", s),
+        Value::F64(f) => println!("Float: {}", f),
     }
 }
 ```
+
+## Features
+
+- **Automatic Variant Creation**: Generates enum variants for types
+  like `i32`, `String`, or custom structs with CamelCase naming.
+- **Type Conversions**: Implements `From<T>` for each variant and `TryFrom<Enum>`
+  with the `impl TryInto` directive.
+- **Method and Trait Delegation**: Delegates methods or entire traits to
+  underlying types.
+- **Type Introspection**: Provides `count`, `types`, and `type_name`
+  methods with `impl introspection`.
+- **Polymorphic Vec**: Generates a `Vec<Enum>` wrapper with a `vec!`-like macro
+  and variant-specific methods (e.g., `first_i32`, `count_string`) via
+  `vec`.
+- **Customizable Variants**: Allows overriding default variant names.
+- **Supported Types**: Handles path types, references, arrays, and tuples.
+
+Use `impl` directives to enable features explicitly (e.g., `impl TryInto is_as`). Cargo features (`try_into`, `is_as`, `introspection`) are
+deprecated but supported for backward compatibility. See the [Feature Flags section](https://github.com/franklaranja/nodyn/blob/main/src/lib.rs#feature-flags)
+for details.
+
+### Vec Wrapper Example
+
+Use the `vec` feature to create a polymorphic `Vec` with variant-specific
+methods:
+
+```rust
+nodyn::nodyn! {
+    #[derive(Debug, Clone)]
+    pub enum Item {
+        i32,    // Gold coins
+        String, // Weapon names
+        f64,    // Health potions (liters)
+    }
+    vec Inventory;
+}
+
+let mut inventory = inventory![100, "sword".to_string(), 0.5, "axe".to_string()];
+// Add more gold
+inventory.push(50);
+// Check for weapons in the inventory
+assert!(inventory.any_string());
+// Total gold coins
+let total_gold = inventory.iter_i32().sum::<i32>();
+assert_eq!(total_gold, 150);
+// Get a potion
+if let Some(potion) = inventory.first_f64() {
+    println!("Found potion: {} liters", potion); // Prints: 0.5 liters
+}
+```
+
+See the Polymorphic Vec section in the [Documentation](https://docs.rs/nodyn)
 
 ## Method Delegation Example
 
 ```rust
 nodyn::nodyn! {
     enum Container { String, Vec<u8> }
-
     impl {
-        // Delegate methods that exist on all types
         fn len(&self) -> usize;
         fn is_empty(&self) -> bool;
         fn clear(&mut self);
@@ -87,9 +117,13 @@ nodyn::nodyn! {
 let mut container: Container = "hello".to_string().into();
 assert_eq!(container.len(), 5);
 assert!(!container.is_empty());
+container.clear();
+assert!(container.is_empty());
 ```
 
 ## Trait Implementation Example
+
+Delegate entire traits when all wrapped types implement them:
 
 ```rust
 use std::fmt::{self, Display};
@@ -101,27 +135,28 @@ nodyn::nodyn! {
     impl Display {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
     }
+
+    vec Displayables;
 }
 
-let values: Vec<Displayable> = vec![
-    42.into(),
-    "hello".to_string().into(),
-    3.14.into(),
-];
+let values = displayables![42, "hello".to_string(), 3.14];
 
 for val in values {
     println!("{}", val); // Uses delegated Display implementation
 }
 ```
 
-## Advanced Example
+### JSON Example
+
+This example creates a JSON-like data structure with nested arrays,
+showcasing trait delegation and Polymorphic Vec features:
 
 ```rust
 use std::fmt;
 
 #[derive(Debug, Clone)]
 pub struct Null;
-//!
+
 impl fmt::Display for Null {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "null")
@@ -129,16 +164,11 @@ impl fmt::Display for Null {
 }
 
 #[derive(Debug, Clone)]
-pub struct JsonArray(Vec<JsonValue>);
+pub struct JsonArray(JsonValueVec);
 
 impl fmt::Display for JsonArray {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = self
-            .0
-            .iter()
-            .map(ToString::to_string)
-            .collect::<Vec<_>>()
-            .join(", ");
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = self.0.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ");
         write!(f, "[{s}]")
     }
 }
@@ -152,6 +182,8 @@ nodyn::nodyn! {
         String,
         JsonArray,
     }
+    
+    vec;
 
     impl fmt::Display {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
@@ -170,64 +202,50 @@ nodyn::nodyn! {
     }
 }
 
-let values: Vec<JsonValue> = vec![
-    Null.into(),                // null
-    true.into(),                // boolean
-    42.0.into(),                // number
-    "hello".to_string().into(), // string
-    JsonArray(vec![
-        Null.into(),
-        false.into(),
-        33.0.into(),
-        "world".to_string().into(),
-    ]) .into(),
-];
+
+let mut values = JsonValueVec::default();
+values.push(Null);
+values.push(true);
+values.push(42.0);
+values.push("hello".to_string());
+values.push(JsonArray(json_value_vec![Null, false, 33.0]));
 
 for val in &values {
     println!("{}: {}", val.json_type_name(), val);
 }
 
-// null: null
-// boolean: true
-// number: 42
-// string: hello
-// array: [null, false, 33, world]
+## Installation
+
+Add `nodyn` to your `Cargo.toml`:
+
+```toml
+[dependencies]
+nodyn = "0.2.0"
 ```
 
-## Features
+## Comparison
 
-All features are enabled by default.
+| Feature | nodyn | enum_dispatch | sum_type | Box<dyn Trait> |
+|---------|-------|---------------|----------|----------------|
+| **Runtime Cost** | Zero | Zero | Zero | Heap allocation |
+| **Trait Delegation** | ✅ Yes | ✅ Scoped only | ❌ No | ✅ Yes |
+| **Method Delegation** | ✅ Yes | ❌ No | ❌ No | ❌ No |
+| **Type Introspection** | ✅ Built-in | ❌ No | ❌ No | ❌ No |
+| **Vec Wrapper** | ✅ Yes | ❌ No | ❌ No | ❌ No |
+| **Compile-Time Known** | Required | Required | Required | Not required |
+| **Memory Overhead** | Discriminant only | Discriminant only | Discriminant only | Pointer + vtable |
 
-| Feature | enables |
-|-------|-------|
-| `from`          | automatic From trait implementation |
-| `try_into`      | automatic TryFrom trait implementation |
-| `introspection` | generation of type introspection functions |
-| `is_as`         | generation of variant test and accessor functions |
+- **[enum_dispatch](https://crates.io/crates/enum_dispatch)**: Optimizes dynamic dispatch with zero-cost enums but lacks method delegation and Vec wrappers.
+- **[sum_type](https://crates.io/crates/sum_type)**: Simplifies enum creation but lacks advanced features like delegation or introspection.
 
-## 📚 Documentation
+## Documentation
 
 - [API Documentation](https://docs.rs/nodyn)
 - [Changelog](https://github.com/franklaranja/nodyn/blob/main/CHANGELOG.md)
 
-## 🆚 Comparison
+## Contributing
 
-| Feature | nodyn | enum_dispatch | sum_type | Box\<dyn Trait\> |
-|---------|-------|---------------|----------|----------------|
-| **Runtime cost** | Zero | Zero | Zero | Heap allocation |
-| **Trait delegation** | ✅ Yes | ✅ Scoped only | ❌ No | ✅ Yes |
-| **Method delegation** | ✅ Yes | ❌ No | ❌ No | ❌ No |
-| **Type introspection** | ✅ Built-in | ❌ No | ❌ No | ❌ No |
-| **Compile-time known** | Required | Required | Required | Not required |
-| **Memory overhead** | Discriminant only | Discriminant only | Discriminant only | Pointer + vtable |
-
-- **[enum_dispatch]**: Near drop-in replacement for dynamic-dispatched method
-  calls with up to 10x the speed.
-- **[sum_type]**: A convenience macro for creating a wrapper enum which
-  may be one of several distinct types.
-
-[enum_dispatch]: https://crates.io/crates/enum_dispatch
-[sum_type]: https://crates.io/crates/sum_type
+Contributions are welcome! Check out the [GitHub repository](https://github.com/franklaranja/nodyn) for issues, feature requests, or to submit pull requests.
 
 ## License
 
@@ -237,6 +255,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 <div align="center">
 
-**[Documentation](https://docs.rs/nodyn) | [Crates.io](https://crates.io/crates/nodyn) | [Repository](https://github.com/yourusername/nodyn)**
+**[Documentation](https://docs.rs/nodyn) | [Crates.io](https://crates.io/crates/nodyn) | [Repository](https://github.com/franklaranja/nodyn)**
 
 </div>

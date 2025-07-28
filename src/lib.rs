@@ -1,11 +1,15 @@
+//! <div align="center">
+//!
 //! *Easy polymorphism with enums*
 //!
+//! </div>
+//!
 //! The `nodyn!` macro generates a Rust `enum` that wraps a fixed set of [types](#supported-types), providing automatic
-//! implementations for type conversions, [method delegation](#method-delegation), and [trait delegation](#trait-delegation). This enables
+//! implementations for [type conversions](#type-conversions-and-introspection), [method delegation](#method-delegation), and [trait delegation](#trait-delegation). This enables
 //! type-safe storage of different types without the runtime overhead of trait objects, ideal for
 //! scenarios requiring zero-cost abstractions for a known set of types at compile time.
 //!
-//! ## Why Use Enum Wrappers?
+//! ## Why use Nodyn?
 //!
 //! In Rust, handling values of different types typically involves:
 //! - **Trait Objects**: Enable dynamic dispatch but incur runtime overhead and type erasure.
@@ -14,22 +18,11 @@
 //!
 //! The `nodyn!` macro simplifies [creating enum wrappers](#syntax) by generating boilerplate for variant creation,
 //! type conversions, method/trait delegation, and introspection utilities.
-//! `nodyn!` can also generate a special [polymorphic `Vec`](#vec-wrapper) for your `enum`.
+//! `nodyn!` can also generate a special [polymorphic `Vec`](#polymorphic-vec) for your `enum`.
 //!
-//! ## Key Features
+//! ## Quick Start
 //!
-//! - **Automatic Variant Creation**: Generates an enum with variants for specified types.
-//! - **Type Conversion**: Implements `From<T>` for each variant type and optionally
-//!   `TryFrom<Enum>` for `T` for non-reference types (with [`TryInto`](#tryfrom-trait-with-tryinto) feature).
-//!   Additional type conversion tools can be generated with the [`as_is`](#type-checking-and-conversion-methods-with-is_as) feature
-//! - **Method and Trait Delegation**: [Delegates methods](#method-delegation) or entire [traits](#trait-delegation) to underlying types.
-//! - **Type Introspection**: Provides `count`, `types`, and `type_name` methods to query variant
-//!   information (with [introspection](#type-information-methods-with-introspection) feature).
-//! - **Custom Variant Names**: Allows overriding default variant names for clarity.
-//! - **Vec Wrapper**: Generates a `Vec<Enum>` wrapper with [delegated `Vec` methods](#delegated-vec-methods-and-traits) and
-//!   and [extra functionality](#variant-methods-and-traits) such as [construction macro](#a-vec-like-macro) to leverage the enums features.
-//!
-//! ## Basic Example
+//! Create a simple enum wrapper for `i32`, `String`, and `f64`:
 //!
 //! ```rust
 //! nodyn::nodyn! {
@@ -42,9 +35,9 @@
 //! }
 //!
 //! let values: Vec<Value> = vec![
-//!     42.into(),
-//!     "hello".to_string().into(),
-//!     3.14.into(),
+//!     42.into(),                  // Converts i32 to Value::I32
+//!     "hello".to_string().into(), // Converts String to Value::String
+//!     3.14.into(),                // Converts f64 to Value::F64
 //! ];
 //!
 //! for value in values {
@@ -55,6 +48,19 @@
 //!     }
 //! }
 //! ```
+//!
+//! ## Key Features
+//!
+//! - **Automatic Variant Creation**: Generates an enum with variants for specified types.
+//! - **Type Conversion**: Implements `From<T>` for each variant type and optionally
+//!   `TryFrom<Enum>` for `T` for non-reference types (with [`TryInto`](#from-and-tryfrom) feature).
+//!   Additional type conversion tools can be generated with the [`as_is`](#type-checking-and-conversion-methods-with-is_as) feature
+//! - **Method and Trait Delegation**: [Delegates methods](#method-delegation) or entire [traits](#trait-delegation) to underlying types.
+//! - **Type Introspection**: Provides `count`, `types`, and `type_name` methods to query variant
+//!   information (with [introspection](#introspection-methods-with-introspection) feature).
+//! - **Custom Variant Names**: Allows overriding default variant names for clarity.
+//! - **Polymorphic `Vec`s**: Generates a `Vec<Enum>` wrapper with [delegated `Vec` methods](#delegated-vec-methods-and-traits) and
+//!   and [extra functionality](#variant-methods-and-traits) such as [construction macro](#a-vec-like-macro) to leverage the enums features.
 //!
 //! ## Trait Delegation Example
 //!
@@ -118,6 +124,9 @@
 //! );
 //! ```
 //!
+//! [book]: https://doc.rust-lang.org/book/ch18-02-trait-objects.html#using-trait-objects-that-allow-for-values-of-different-types
+//! [listing-10-13]: https://doc.rust-lang.org/book/ch10-02-traits.html#listing-10-13
+//!
 //! ## Supported Types
 //!
 //! The macro supports these type categories with automatic variant name generation:
@@ -154,9 +163,6 @@
 //! ];
 //! ```
 //!
-//! [book]: https://doc.rust-lang.org/book/ch18-02-trait-objects.html#using-trait-objects-that-allow-for-values-of-different-types
-//! [listing-10-13]: https://doc.rust-lang.org/book/ch10-02-traits.html#listing-10-13
-//!
 //! # Syntax
 //!
 //! ```ignore
@@ -189,58 +195,13 @@
 //! }
 //! ```
 //!
-//! ## Generated Methods
+//! ## Type Conversions and Introspection
 //!
-//! ### Type Information Methods (with `introspection`)
+//! ### `From` and `TryFrom`
 //!
-//! ```rust
-//! nodyn::nodyn! {
-//!     enum Value { i32, String, f64 }
-//!     impl introspection;
-//! }
-//!
-//! assert_eq!(Value::count(), 3);
-//! assert_eq!(Value::types(), ["i32", "String", "f64"]);
-//! let val: Value = 42.into();
-//! assert_eq!(val.type_name(), "i32");
-//! ```
-//!
-//! ### Type Checking and Conversion Methods (with `is_as`)
-//!
-//! ```rust
-//! nodyn::nodyn! {
-//!     enum Container { String, Vec<u8> }
-//!     impl is_as;
-//! }
-//!
-//! let container: Container = "hello".to_string().into();
-//! assert!(container.is_string());
-//! assert!(!container.is_vec_u8());
-//! if let Some(s) = container.try_as_string() {
-//!     println!("Got string: {}", s);
-//! }
-//! let container: Container = "hello".to_string().into();
-//! if let Some(s_ref) = container.try_as_string_ref() {
-//!     println!("String reference: {}", s_ref);
-//! }
-//! ```
-//!
-//! Note: `*_ref()` and `*_mut()` methods are not generated for variants that wrap references.
-//!
-//! ## Automatic Trait Implementations
-//!
-//! ### From Trait
-//!
-//! ```rust
-//! nodyn::nodyn! {
-//!     enum Value { i32, String }
-//! }
-//!
-//! let num: Value = 42.into();
-//! let text: Value = "hello".to_string().into();
-//! ```
-//!
-//! ### `TryFrom` Trait (with `TryInto`)
+//! The macro automatically implements `From<T>` for each variant type.
+//! With the `TryInto` feature, it also implements `TryFrom<Enum>`
+//! for non-reference types.
 //!
 //! ```rust
 //! nodyn::nodyn! {
@@ -272,17 +233,57 @@
 //! assert_eq!(i64::try_from(foo), Ok(42i64));
 //! ```
 //!
-//! # Method Delegation
+//! ### Introspection Methods (with `introspection`)
 //!
-//! When all wrapped types implement a method with the same signature, you can
-//! delegate it in an `impl` block:
+//! Enable type introspection with the `introspection` feature to query variant information:
+//!
+//! ```rust
+//! nodyn::nodyn! {
+//!     enum Value { i32, String, f64 }
+//!     impl introspection;
+//! }
+//!
+//! assert_eq!(Value::count(), 3);
+//! assert_eq!(Value::types(), ["i32", "String", "f64"]);
+//! let val: Value = 42.into();
+//! assert_eq!(val.type_name(), "i32");
+//! ```
+//!
+//! ### Type Checking and Conversion Methods (with `is_as`)
+//!
+//! The `is_as` feature generates methods like `is_*` and `try_as_*`
+//! for variant-specific checks and conversions:
 //!
 //! ```rust
 //! nodyn::nodyn! {
 //!     enum Container { String, Vec<u8> }
+//!     impl is_as;
+//! }
 //!
+//! let container: Container = "hello".to_string().into();
+//! assert!(container.is_string());
+//! assert!(!container.is_vec_u8());
+//! if let Some(s) = container.try_as_string() {
+//!     println!("Got string: {}", s);
+//! }
+//! let container: Container = "hello".to_string().into();
+//! if let Some(s_ref) = container.try_as_string_ref() {
+//!     println!("String reference: {}", s_ref);
+//! }
+//! ```
+//!
+//! Note: `*_ref()` and `*_mut()` methods are not generated for variants that wrap references.
+//!
+//! ## Method and Trait Delegation
+//!
+//! ### Method Delegation
+//!
+//! Delegate methods that exist on all wrapped types with the same signature:
+//!
+//! ```rust
+//! nodyn::nodyn! {
+//!     enum Container { String, Vec<u8> }
 //!     impl {
-//!         // Delegate methods that exist on all types
 //!         fn len(&self) -> usize;
 //!         fn is_empty(&self) -> bool;
 //!         fn clear(&mut self);
@@ -292,12 +293,13 @@
 //! let mut container: Container = "hello".to_string().into();
 //! assert_eq!(container.len(), 5);
 //! assert!(!container.is_empty());
+//! container.clear();
+//! assert!(container.is_empty());
 //! ```
 //!
 //! # Trait Delegation
 //!
-//! When all wrapped types implement a trait, you can implement it for the wrapper
-//! by delegating the required methods:
+//! Delegate entire traits when all wrapped types implement them:
 //!
 //! ```rust
 //! use std::fmt::{self, Display};
@@ -320,13 +322,23 @@
 //! }
 //! ```
 //!
-//! ## `Vec` Wrapper
+//! See the [JSON Example](#json-example) for a practical application of trait delegation.
 //!
-//! The `vec` feature generates a wrapper around a [`std::vec::Vec<Enum>`][std::vec::Vec], implementing
-//! many `Vec` methods and variant-specific accessors (e.g., `first_number` for an `i32` variant).
-//! Methods like `push` and `insert` leverage `Into<Enum>`, allowing direct insertion of wrapped types.
+//! ## Polymorphic `Vec`
 //!
-//! ### Example
+//! The `vec` feature generates a `Vec<Enum>` wrapper with delegated `Vec`
+//! methods and variant-specific utilities. It supports flexible insertion
+//! via `Into<Enum>` and provides methods like `first_*`, `count_*`,
+//! and `all_*` for variant-specific access.
+//!
+//! A `vec!`-like macro is also generated for easy initialization.
+//!
+//! ### Basic Polymorphic Vec
+//!
+//! Using `vec` generates a wrapper named after the enum with the suffix `Vec`.
+//! The generated wrapper has the same derive attributes as the enum, plus
+//! `Default`. If the enum is `Copy`, that won't be included in the derive
+//! for the wrapper. The visibility of the wrapper and its methods matches the enum's.
 //!
 //! ```rust
 //! nodyn::nodyn! {
@@ -340,56 +352,102 @@
 //! }
 //!
 //! let mut values = ValueVec::default();
-//! values.push(42);
-//! values.push("hello".to_string());
+//! values.push(42);                    // Accepts i32
+//! values.push("hello".to_string());   // Accepts String
+//! values.push(3.14);                  // Accepts f64
 //! assert_eq!(values.first_i32(), Some(&42));
-//! assert_eq!(values.len(), 2);
+//! assert_eq!(values.len(), 3);
+//! assert_eq!(values.count_string(), 1);
 //! ```
 //!
-//! ### Simple Vec Wrappers
-//!
-//! Using `impl vec` generates a wrapper named after the enum with the extension Vec.
-//! The generated wrapper has the same derive attributes as the enum, plus
-//! `Default`. If the enum is `Copy` that won't be included in the derive
-//! for the wrapper. The visibility of the wrapper and its methods is the
-//! same as the enums.
-//!
-//! You can specify a name for the wrapper:
+//! You can specify a custom name for the wrapper:
 //!
 //! ```rust
 //! nodyn::nodyn! {
-//!     #[derive(Debug, PartialEq, Clone)]
+//!     #[derive(Debug, Clone)]
 //!     pub enum Value {
 //!         i32,
 //!         String,
-//!         f64,
 //!     }
-//!
 //!     vec Values;
 //! }
+//!
+//! let values = values![42, "hello".to_string()];
 //! ```
 //!
-//! ### A `vec!` like macro
+//! ## Polymorphic Vec Features
 //!
-//! Nodyn generates a macro for your vec wrapper with the name
+//! ### Filtering and Iteration
+//!
+//! ```rust
+//! nodyn::nodyn! {
+//!     #[derive(Debug, Clone, PartialEq)]
+//!     pub enum Data<'a> {
+//!         i32,
+//!         &'a str,
+//!         bool,
+//!     }
+//!     vec;
+//! }
+//!
+//! let mut data = data_vec![42, "hello", true, 99, "world", false];
+//!
+//! for number in data.iter_i32() {
+//!     println!("Number: {}", number);  // Prints: 42, 99
+//! }
+//!
+//! assert_eq!(data.count_str_ref(), 2);
+//! assert_eq!(data.count_bool(), 2);
+//!
+//! assert!(!data.all_i32());  // Not all items are i32
+//! assert!(data.any_str_ref()); // At least one string exists
+//! ```
+//!
+//! ### Construction from Slices
+//!
+//! ```rust
+//! nodyn::nodyn! {
+//!     #[derive(Debug, Clone)]
+//!     pub enum Number {
+//!         i32,
+//!         f64,
+//!     }
+//!     vec Numbers;
+//! }
+//!
+//! // Construct from homogeneous slices
+//! let integers: &[i32] = &[1, 2, 3, 4, 5];
+//! let mut numbers = Numbers::from(integers);
+//!
+//! let floats = vec![1.1, 2.2, 3.3];
+//! numbers.extend(floats);  // Extends with Vec<f64> via Into
+//!
+//! assert_eq!(numbers.count_i32(), 5);
+//! assert_eq!(numbers.count_f64(), 3);
+//! ```
+//!
+//!
+//! ## A `vec!`-like Macro
+//!
+//! Nodyn generates a macro for your polymorphic vec with the name
 //! of the wrapper changed to snake case. As the `nodyn!` macro
 //! does not know where it is invoked, you have to tell it the
 //! full module path including the crate name, so the generated
-//! macro works correctly. If you don't specify the module path
-//! it is assumed the vec wrapper and enum are in the local scope.
+//! macro works correctly. If you don't specify the module path,
+//! it is assumed the polymorphic vec and enum are in the local scope.
 //!
 //! The macro works like `vec!` but accepts any value within your
-//! enum.
+//! enum and uses `Into` for automatic conversion.
 //!
-//! The macro requires that the wrapper has the `#[derive('Default)]`
-//! attribute (the standard vec wrapper always has this).
+//! The macro requires that the wrapper has `#[derive(Default)]`
+//! (the standard polymorphic vec always has this).
 //!
-//! #### Example
+//! ### Example
 //!
 //! ```ignore
-//! // in src/my/awsome/foo.rs:
+//! // in my_crate/src/foo/bar.rs:
 //! nodyn::nodyn! {
-//!     #[module_path = "my::awsome::foo"]
+//!     #[module_path = "my_crate::foo::bar"]
 //!     #[derive(Debug, Clone)]
 //!     pub enum Value<'a> {
 //!         i32,
@@ -404,18 +462,18 @@
 //! let my_values = values!["hello", 42, "world", 0.1];
 //! ```
 //!
-//! ### Custom Vec Wrappers
+//! ## Custom Polymorphic Vecs
 //!
 //! Define a custom wrapper struct with additional fields using the
 //! `#[vec]` or `#[vec(field_name)]` attribute. Without
-//! a field name 'inner' is used. `nodyn!` adds the field. Unlike the
-//! standard vec wrapper, derive arguments are not copied from the enum.
-//! `nodyn!` does implement neither `Deref` nor `DerefMut`, so you can!
+//! a field name, 'inner' is used. `nodyn!` adds the field. Unlike the
+//! standard polymorphic vec, derive arguments are not copied from the enum.
+//! `nodyn!` does not implement `Deref` or `DerefMut`, so you can!
 //!
-//! I recommend you put a `#[derive('Default)]` on your custom vec wrapper
-//! so nodyn can generate the macro and implement the From trait.
+//! I recommend you put `#[derive(Default)]` on your custom polymorphic vec
+//! so nodyn can generate the macro and implement the `From` trait.
 //!
-//! #### Example
+//! ### Example
 //!
 //! ```rust
 //! nodyn::nodyn! {
@@ -426,7 +484,7 @@
 //!     }
 //!
 //!     #[vec(inner_vec)]
-//!     #[derive(Debug, Clone)]
+//!     #[derive(Debug, Clone, Default)]
 //!     pub struct CustomValues {
 //!         metadata: String,
 //!     }
@@ -441,108 +499,138 @@
 //! assert_eq!(values.len(), 1);
 //! ```
 //!
-//! ### Variant methods and traits
+//! ## Variant Methods and Traits
 //!
-//! For each variant the following methods are generated for the wrapper:
+//! For each variant, the following methods are generated for the wrapper:
 //!
-//! | method            | required traits | notes       |
-//! |-------------------|------|------------------------|
-//! | `all_*`           | none |   |
-//! | `any_*`           | none |   |
-//! | `count_*`         | none | Counts all items of variant, iteratimg over whole vec |
-//! | `enumerate_*_mut` | none | idem.                  |
-//! | `enumerate_*`     | none | Enumerate with index from the wrapper |
-//! | `first_*_mut`     | none | [`first_mut`][core::slice:first_mut()]|
-//! | `first_*`         | none | [`first`][core::slice:first()]    |
-//! | `iter_*_mut`      | none | [`std::slice:last_mut()`] |
-//! | `iter_*`          | none | [`std::slice:last()`]     |
-//! | `last_*_mut`      | none | [`std::slice:last_mut()`] |
-//! | `last_*`          | none | [`std::slice:last()`]     |
+//! | Method            | Required Traits | Description |
+//! |-------------------|-----------------|-------------|
+//! | `all_*`           | none | Returns `true` if all items are of this variant |
+//! | `any_*`           | none | Returns `true` if any item is of this variant |
+//! | `count_*`         | none | Counts all items of this variant |
+//! | `enumerate_*`     | none | Enumerate items of this variant with their indices |
+//! | `enumerate_*_mut` | none | Enumerate mutable items of this variant with their indices |
+//! | `first_*`         | none | Returns reference to first item of this variant |
+//! | `first_*_mut`     | none | Returns mutable reference to first item of this variant |
+//! | `iter_*`          | none | Iterator over items of this variant |
+//! | `iter_*_mut`      | none | Mutable iterator over items of this variant |
+//! | `last_*`          | none | Returns reference to last item of this variant |
+//! | `last_*_mut`      | none | Returns mutable reference to last item of this variant |
 //!
-//! And the following traits for each variant with type V:
+//! And the following traits for each variant with type `V`:
 //!
-//! | trait             | required trait      |
-//! |-------------------|---------------------|
-//! | `Extend<V>`       | `Clone`             |
-//! | `From<&[V]>`      | `Default` & `Clone` |
-//! | `From<&mut [V]>`  | `Default` & `Clone` |
-//! | `From<Vec<V>>`    | `Default`           |
+//! | Trait             | Required Trait  | Description |
+//! |-------------------|-----------------|-------------|
+//! | `Extend<V>`       | `Clone`         | Extend wrapper with items of this variant |
+//! | `From<&[V]>`      | `Default` & `Clone` | Create wrapper from slice of this variant |
+//! | `From<&mut [V]>`  | `Default` & `Clone` | Create wrapper from mutable slice |
+//! | `From<Vec<V>>`    | `Default`       | Create wrapper from `Vec` of this variant |
 //!
-//! ### Delegated `Vec` methods and traits
+//! ### Game Inventory Example
 //!
-//! the `vec` wrapper implements many [`std::vec::Vec`] methods and traits, with some modified to
-//! leverage `nodyn` features. the following table summarizes them:
+//! This example demonstrates the power of the Polymorphic Vec in a game
+//! inventory context:
 //!
-//! | method | required traits | differences from [`std::vec::Vec`] |
-//! |--------|-----------------|------------------------------------|
-//! | [`append`][std::vec::Vec::append()]                     | none | none; direct delegation. |
-//! | [`as_mut_slice`][std::vec::Vec::as_mut_slice()]         | none | none; direct delegation. |
-//! | [`as_slice`][std::vec::Vec::as_slice()]                 | none | none; direct delegation. |
-//! | [`binary_search_by_key`][std::vec::Vec::binary_search_key()] | none | none; direct delegation. |
-//! | [`binary_search_by`][std::vec::Vec::binary_search()]    | none    | none; direct delegation. |
-//! | [`binary_search`][std::vec::Vec::binary_search()]       | `Ord`   | none; direct delegation. |
-//! | [`capacity`][std::vec::Vec::capacity()]                 | none | none; direct delegation. |
-//! | [`clear`][std::vec::Vec::clear()]                       | none | none; direct delegation. |
-//! | [`clone_from_slice`][std::vec::Vec::clone_from_slice()] | `Clone` | none; direct delegation. |
-//! | [`copy_from_slice`][std::vec::Vec::copy_from_slice()]   | `Copy`  | none; direct delegation. |
-//! | [`copy_within`][std::vec::Vec::copy_within()]           | `Copy`  | none; direct delegation. |
-//! | [`dedup_by_key`][std::vec::Vec::dedup_by_key()]         | none | none; direct delegation. |
-//! | [`dedup_by`][std::vec::Vec::dedup_by()]                 | none | none; direct delegation. |
-//! | [`dedup`][std::vec::Vec::dedup()]                       | `PartialEq` | none; direct delegation. |
-//! | [`extend_from_slice`][std::vec::Vec::extend_from_slice()]   | `Clone` | none; direct delegation. |
-//! | [`extend_from_within`][std::vec::Vec::extend_from_within()] | `Clone` | none; direct delegation. |
-//! | [`extract_if`][std::vec::Vec::extract_if()]             | none | none; direct delegation. |
-//! | [`fill_with`][std::vec::Vec::fill_with()]               | none    | accepts `Into<enum>`. |
-//! | [`fill`][std::vec::Vec::fill()]                         | `Clone` | none; direct delegation. |
-//! | [`first_mut`][std::vec::Vec::first_mut()]               | none | none; direct delegation. |
-//! | [`first`][std::vec::Vec::first()]                       | none | none; direct delegation. |
-//! | [`get_mut`][std::vec::Vec::get_mut()]                   | none | none; direct delegation. |
-//! | [`get`][std::vec::Vec::get()]                           | none | none; direct delegation. |
-//! | [`insert`][std::vec::Vec::insert()]                     | none | accepts `Into<enum>`. |
-//! | [`into_boxed_slice`][std::vec::Vec::into_boxed_slice()] | none | none; direct delegation. |
-//! | [`is_empty`][std::vec::Vec::is_empty()]                 | none | none; direct delegation. |
-//! | [`is_sorted_by_key`][std::vec::Vec::is_sorted_key()]    | none | none; direct delegation. |
-//! | [`is_sorted_by`][std::vec::Vec::is_sorted()]            | none | none; direct delegation. |
-//! | [`is_sorted`][std::vec::Vec::is_sorted()]               | `PartialOrd`    | none; direct delegation. |
-//! | [`iter_mut`][std::vec::Vec::iter_mut()]                 | none | none; direct delegation. |
-//! | [`iter`][std::vec::Vec::iter()]                         | none | none; direct delegation. |
-//! | [`last_mut`][std::vec::Vec::last_mut()]                 | none | none; direct delegation. |
-//! | [`last`][std::vec::Vec::last()]                         | none | none; direct delegation. |
-//! | [`len`][std::vec::Vec::len()]                           | none | none; direct delegation. |
-//! | [`new`][std::vec::Vec::new()]                           | `Default`   | initializes other fields with `Default::default()`. |
-//! | [`pop_if`][std::vec::Vec::pop_if()]                     | none | none; direct delegation. |
-//! | [`pop`][std::vec::Vec::pop()]                           | none | none; direct delegation. |
-//! | [`push`][std::vec::Vec::push()]                         | none | accepts `Into<enum>`. |
-//! | [`remove`][std::vec::Vec::remove()]                     | none | none; direct delegation. |
-//! | [`reserve_exact`][std::vec::Vec::reserve_exact()]       | none | none; direct delegation. |
-//! | [`reserve`][std::vec::Vec::reserve()]                   | none | none; direct delegation. |
-//! | [`resize`][std::vec::Vec::resize()]                     | `Clone`     | accepts `Into<enum>`. |
-//! | [`retain_mut`][std::vec::Vec::retain_mut()]             | none | none; direct delegation. |
-//! | [`retain`][std::vec::Vec::retain()]                     | none | none; direct delegation. |
-//! | [`reverse`][std::vec::Vec::reverse()]                   | none | none; direct delegation. |
-//! | [`rotate_left`][std::vec::Vec::rotate_left()]           | none    | none; direct delegation. |
-//! | [`rotate_right`][std::vec::Vec::rotate_right()]         | none    | none; direct delegation. |
-//! | [`shrink_to_fit`][std::vec::Vec::shrink_to_fit()]       | none | none; direct delegation. |
-//! | [`shrink_to`][std::vec::Vec::shrink_to()]               | none | none; direct delegation. |
-//! | [`sort_by_key`][std::vec::Vec::sort_key()]              | none    | none; direct delegation. |
-//! | [`sort_by`][std::vec::Vec::sort()]                      | none    | none; direct delegation. |
-//! | [`sort_unstable_by_key`][std::vec::Vec::sort_unstable_key()] | none | none; direct delegation. |
-//! | [`sort_unstable_by`][std::vec::Vec::sort_unstable()]    | none    | none; direct delegation. |
-//! | [`sort_unstable`][std::vec::Vec::sort_unstable()]       | `Ord`   | none; direct delegation. |
-//! | [`sort`][std::vec::Vec::sort()]                         | `Ord`   | none; direct delegation. |
-//! | [`splice`][std::vec::Vec::splice()]                     | none | none; direct delegation. |
-//! | [`split_first_mut`][std::vec::Vec::split_first_mut()]   | none | none; direct delegation. |
-//! | [`split_first`][std::vec::Vec::split_first()]           | none | none; direct delegation. |
-//! | [`split_last_mut`][std::vec::Vec::split_last_mut()]     | none | none; direct delegation. |
-//! | [`split_last`][std::vec::Vec::split_last()]             | none | none; direct delegation. |
-//! | [`split_off`][std::vec::Vec::split_off()]               | `Default`   | initializes other fields with `Default::default()`. |
-//! | [`swap_remove`][std::vec::Vec::swap_remove()]           | none | none; direct delegation. |
-//! | [`swap`][std::vec::Vec::swap()]                         | none | none; direct delegation. |
-//! | [`to_vec`][std::vec::Vec::to_vec()]                     | `Clone` | none; direct delegation. |
-//! | [`truncate`][std::vec::Vec::truncate()]                 | none | none; direct delegation. |
-//! | [`try_reserve_exact`][std::vec::Vec::try_reserve_exact()]   | none | none; direct delegation. |
-//! | [`try_reserve`][std::vec::Vec::try_reserve()]           | none | none; direct delegation. |
-//! | [`with_capacity`][std::vec::Vec::with_capacity()]       | `Default`   | initializes other fields with `Default::default()`. |
+//! ```rust
+//! nodyn::nodyn! {
+//!     #[derive(Debug, Clone)]
+//!     pub enum Item {
+//!         i32,    // Gold coins
+//!         String, // Weapon names
+//!         f64,    // Health potions (liters)
+//!     }
+//!     vec Inventory;
+//! }
+//!
+//! let mut inventory = inventory![100, "sword".to_string(), 0.5, "axe".to_string()];
+//! // Add more gold
+//! inventory.push(50);
+//! // Check for weapons in the inventory
+//! assert!(inventory.any_string());
+//! // Total gold coins
+//! let total_gold = inventory.iter_i32().sum::<i32>();
+//! assert_eq!(total_gold, 150);
+//! // Get a potion
+//! if let Some(potion) = inventory.first_f64() {
+//!     println!("Found potion: {} liters", potion); // Prints: 0.5 liters
+//! }
+//! ```
+//!
+//! ## Delegated `Vec` Methods and Traits
+//!
+//! The `vec` wrapper implements many [`Vec`] methods and traits, with some modified to
+//! leverage `nodyn` features. The following table summarizes them:
+//!
+//! | Method | Required Traits | Differences from [`Vec`] |
+//! |--------|-----------------|----------------------------------------|
+//! | [`append`][Vec::append] | none | none; direct delegation |
+//! | [`as_mut_slice`][Vec::as_mut_slice] | none | none; direct delegation |
+//! | [`as_slice`][Vec::as_slice] | none | none; direct delegation |
+//! | [`binary_search_by_key`][slice::binary_search_by_key] | none | none; direct delegation |
+//! | [`binary_search_by`][slice::binary_search_by] | none | none; direct delegation |
+//! | [`binary_search`][slice::binary_search] | `Ord` | none; direct delegation |
+//! | [`capacity`][Vec::capacity] | none | none; direct delegation |
+//! | [`clear`][Vec::clear] | none | none; direct delegation |
+//! | [`clone_from_slice`][slice::clone_from_slice] | `Clone` | none; direct delegation |
+//! | [`copy_from_slice`][slice::copy_from_slice] | `Copy` | none; direct delegation |
+//! | [`copy_within`][slice::copy_within] | `Copy` | none; direct delegation |
+//! | [`dedup_by_key`][Vec::dedup_by_key] | none | none; direct delegation |
+//! | [`dedup_by`][Vec::dedup_by] | none | none; direct delegation |
+//! | [`dedup`][Vec::dedup] | `PartialEq` | none; direct delegation |
+//! | [`extend_from_slice`][Vec::extend_from_slice] | `Clone` | none; direct delegation |
+//! | [`extend_from_within`][Vec::extend_from_within] | `Clone` | none; direct delegation |
+//! | [`extract_if`][Vec::extract_if] | none | none; direct delegation |
+//! | [`fill_with`][slice::fill_with] | none | accepts `Into<enum>` |
+//! | [`fill`][slice::fill] | `Clone` | none; direct delegation |
+//! | [`first_mut`][slice::first_mut] | none | none; direct delegation |
+//! | [`first`][slice::first] | none | none; direct delegation |
+//! | [`get_mut`][slice::get_mut] | none | none; direct delegation |
+//! | [`get`][slice::get] | none | none; direct delegation |
+//! | [`insert`][Vec::insert] | none | accepts `Into<enum>` |
+//! | [`into_boxed_slice`][Vec::into_boxed_slice] | none | none; direct delegation |
+//! | [`is_empty`][Vec::is_empty] | none | none; direct delegation |
+//! | [`is_sorted_by_key`][slice::is_sorted_by_key] | none | none; direct delegation |
+//! | [`is_sorted_by`][slice::is_sorted_by] | none | none; direct delegation |
+//! | [`is_sorted`][slice::is_sorted] | `PartialOrd` | none; direct delegation |
+//! | [`iter_mut`][slice::iter_mut] | none | none; direct delegation |
+//! | [`iter`][slice::iter] | none | none; direct delegation |
+//! | [`last_mut`][slice::last_mut] | none | none; direct delegation |
+//! | [`last`][slice::last] | none | none; direct delegation |
+//! | [`len`][Vec::len] | none | none; direct delegation |
+//! | [`new`][Vec::new] | `Default` | initializes other fields with `Default::default()` |
+//! | [`pop_if`][Vec::pop_if] | none | none; direct delegation |
+//! | [`pop`][Vec::pop] | none | none; direct delegation |
+//! | [`push`][Vec::push] | none | accepts `Into<enum>` |
+//! | [`remove`][Vec::remove] | none | none; direct delegation |
+//! | [`reserve_exact`][Vec::reserve_exact] | none | none; direct delegation |
+//! | [`reserve`][Vec::reserve] | none | none; direct delegation |
+//! | [`resize`][Vec::resize] | `Clone` | accepts `Into<enum>` |
+//! | [`retain_mut`][Vec::retain_mut] | none | none; direct delegation |
+//! | [`retain`][Vec::retain] | none | none; direct delegation |
+//! | [`reverse`][slice::reverse] | none | none; direct delegation |
+//! | [`rotate_left`][slice::rotate_left] | none | none; direct delegation |
+//! | [`rotate_right`][slice::rotate_right] | none | none; direct delegation |
+//! | [`shrink_to_fit`][Vec::shrink_to_fit] | none | none; direct delegation |
+//! | [`shrink_to`][Vec::shrink_to] | none | none; direct delegation |
+//! | [`sort_by_key`][slice::sort_by_key] | none | none; direct delegation |
+//! | [`sort_by`][slice::sort_by] | none | none; direct delegation |
+//! | [`sort_unstable_by_key`][slice::sort_unstable_by_key] | none | none; direct delegation |
+//! | [`sort_unstable_by`][slice::sort_unstable_by] | none | none; direct delegation |
+//! | [`sort_unstable`][slice::sort_unstable] | `Ord` | none; direct delegation |
+//! | [`sort`][slice::sort] | `Ord` | none; direct delegation |
+//! | [`splice`][Vec::splice] | none | none; direct delegation |
+//! | [`split_first_mut`][slice::split_first_mut] | none | none; direct delegation |
+//! | [`split_first`][slice::split_first] | none | none; direct delegation |
+//! | [`split_last_mut`][slice::split_last_mut] | none | none; direct delegation |
+//! | [`split_last`][slice::split_last] | none | none; direct delegation |
+//! | [`split_off`][Vec::split_off] | `Default` | initializes other fields with `Default::default()` |
+//! | [`swap_remove`][Vec::swap_remove] | none | none; direct delegation |
+//! | [`swap`][slice::swap] | none | none; direct delegation |
+//! | [`to_vec`][slice::to_vec] | `Clone` | none; direct delegation |
+//! | [`truncate`][Vec::truncate] | none | none; direct delegation |
+//! | [`try_reserve_exact`][Vec::try_reserve_exact] | none | none; direct delegation |
+//! | [`try_reserve`][Vec::try_reserve] | none | none; direct delegation |
+//! | [`with_capacity`][Vec::with_capacity] | `Default` | initializes other fields with `Default::default()` |
 //!
 //! | trait | required traits | differences from [`std::vec::Vec`] |
 //! |-------|-----------------|------------------------------------|
@@ -566,7 +654,7 @@
 //!
 //! ### Using `impl` (Recommended)
 //!
-//! Specify features within the macro using `impl TryInto`, `impl is_as`, `impl introspection`, or `impl vec`.
+//! Specify features within the macro using `impl TryInto`, `impl is_as`, `impl introspection`, or `vec`.
 //! These are disabled by default, allowing explicit control.
 //!
 //! ### Using Cargo Features (Deprecated)
@@ -583,7 +671,12 @@
 //!
 //! To transition from Cargo features, replace feature flags in `Cargo.toml` with `impl` directives in the macro.
 //!
-//! # Advanced Example
+//! The cargo features will be removed in version 0.3.0.
+//!
+//! ### JSON Example
+//!
+//! This example creates a JSON-like data structure with nested arrays,
+//! showcasing trait delegation and Polymorphic Vec features:
 //!
 //! ```
 //! use std::fmt;
