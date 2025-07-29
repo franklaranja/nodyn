@@ -130,20 +130,20 @@ impl Parse for NodynEnum {
 impl NodynEnum {
     pub(crate) fn to_token_stream(&self) -> TokenStream {
         let enum_definition = self.enum_definition_tokens();
-        let standard_impl = self.standard_impl_tokens();
-        let optional_impl = self.optional_impl_tokens();
+        let default = self.default_tokens();
+        let optional = self.optional_tokens();
         let methods = self.method_tokens();
         let traits = self.trait_tokens();
         let vec_wrappers = self
             .vec_wrappers
             .iter()
-            .map(|s| s.to_token_stream(&self))
+            .map(|s| s.to_token_stream(self))
             .collect::<Vec<_>>();
 
         quote! {
             #enum_definition
-            #standard_impl
-            #optional_impl
+            #default
+            #optional
             #(#methods)*
             #(#traits)*
             #(#vec_wrappers)*
@@ -283,7 +283,7 @@ impl NodynEnum {
         quote! {where #(#predicates ,)* }
     }
 
-    pub(crate) fn enum_definition_tokens(&self) -> TokenStream {
+    fn enum_definition_tokens(&self) -> TokenStream {
         let variants = self.variants.iter().map(Variant::enum_variant_tokens);
         let attrs = &self.attrs;
         let visibility = &self.visibility;
@@ -299,7 +299,7 @@ impl NodynEnum {
     }
 
     #[allow(clippy::wrong_self_convention)]
-    pub(crate) fn from_tokens(&self) -> Vec<TokenStream> {
+    fn from_tokens(&self) -> Vec<TokenStream> {
         let ident = &self.ident;
         let generics = &self.generics;
         self.variants
@@ -318,7 +318,7 @@ impl NodynEnum {
             .collect()
     }
 
-    pub(crate) fn try_from_tokens(&self) -> Vec<TokenStream> {
+    fn try_from_tokens(&self) -> Vec<TokenStream> {
         let ident = &self.ident;
         let generics = &self.generics;
         self.variants
@@ -346,7 +346,7 @@ impl NodynEnum {
     }
 
     /// Generate delegation methods for shared methods.
-    pub(crate) fn method_tokens(&self) -> Vec<TokenStream> {
+    fn method_tokens(&self) -> Vec<TokenStream> {
         let ident = &self.ident;
         let generics = &self.generics;
         self.method_impls
@@ -389,7 +389,7 @@ impl NodynEnum {
             .collect()
     }
 
-    pub(crate) fn trait_tokens(&self) -> Vec<TokenStream> {
+    fn trait_tokens(&self) -> Vec<TokenStream> {
         let wrapper = &self.ident;
         let lt = &self.generics;
         self.trait_impls
@@ -537,7 +537,7 @@ impl NodynEnum {
     }
 
     /// Generates vector accessor methods for a given `Vec` field in a vec wrapper.
-    pub(crate) fn variant_vec_tokens(&self, vec_field: &Ident) -> TokenStream {
+    fn variant_vec_tokens(&self, vec_field: &Ident) -> TokenStream {
         let methods = self
             .variants
             .iter()
@@ -546,14 +546,14 @@ impl NodynEnum {
     }
 
     /// returns a `TokenStream` that is always included
-    pub(crate) fn standard_impl_tokens(&self) -> TokenStream {
+    fn default_tokens(&self) -> TokenStream {
         let from = self.from_tokens();
         quote! {
             #(#from)*
         }
     }
 
-    pub(crate) fn optional_impl_tokens(&self) -> TokenStream {
+    fn optional_tokens(&self) -> TokenStream {
         if self.optional_impl.none() {
             // depreciated feature flags only if no features are set
             #[cfg(feature = "try_into")]

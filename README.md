@@ -2,6 +2,9 @@
 
 [![Crates.io](https://img.shields.io/crates/v/nodyn.svg)](https://crates.io/crates/nodyn)
 [![Docs.rs](https://docs.rs/nodyn/badge.svg)](https://docs.rs/nodyn)
+[![CI](https://github.com/franklaranja/nodyn/actions/workflows/ci.yml/badge.svg)](https://github.com/franklaranja/nodyn/actions/workflows/ci.yml)
+[![Maintenance](https://img.shields.io/badge/maintenance-actively%20developed-brightgreen.svg)](https://github.com/franklaranja/nodyn)
+[![GitHub Issues](https://img.shields.io/github/issues/franklaranja/nodyn)](https://github.com/franklaranja/nodyn/issues)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 <div align="center">
