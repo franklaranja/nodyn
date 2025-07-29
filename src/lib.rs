@@ -742,7 +742,6 @@
 //! }
 
 use proc_macro::TokenStream;
-use quote::quote;
 use syn::parse_macro_input;
 
 mod method_impl;
@@ -764,38 +763,14 @@ pub(crate) use vec_wrapper::VecWrapper;
 #[proc_macro]
 pub fn nodyn(input: TokenStream) -> TokenStream {
     let nodyn_enum = parse_macro_input!(input as NodynEnum);
-
-    let e_num = nodyn_enum.to_enum_definition();
-    let standard_impl = nodyn_enum.to_standard_impl();
-    let optional_impl = nodyn_enum.to_optional_impl();
-    let method_impls = nodyn_enum.to_method_impls();
-    let trait_impls = nodyn_enum.to_trait_impls();
-    let vec_wrappers = nodyn_enum
-        .vec_wrappers
-        .iter()
-        .map(|s| s.to_token_stream(&nodyn_enum))
-        .collect::<Vec<_>>();
-
-    let expanded = quote! {
-        #e_num
-        #standard_impl
-        #optional_impl
-        #(#method_impls)*
-        #(#trait_impls)*
-        #(#vec_wrappers)*
-    };
-
-    TokenStream::from(expanded)
+    TokenStream::from(nodyn_enum.to_token_stream())
 }
 
 pub(crate) mod keyword {
     syn::custom_keyword!(vec);
-    // syn::custom_keyword!(From);
     syn::custom_keyword!(TryInto);
     syn::custom_keyword!(is_as);
     syn::custom_keyword!(introspection);
-    // syn::custom_keyword!(from);
-    // syn::custom_keyword!(str);
 }
 
 use proc_macro2::{Ident, Span};

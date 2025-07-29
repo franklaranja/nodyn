@@ -27,7 +27,7 @@ pub(crate) struct Variant {
 
 impl Variant {
     /// Generates the `TokenStream` for the enum variant definition.
-    pub(crate) fn to_enum_variant(&self) -> TokenStream {
+    pub(crate) fn enum_variant_tokens(&self) -> TokenStream {
         let attrs = &self.attrs;
         let ty = &self.ty;
         let ident = &self.ident;
@@ -41,7 +41,7 @@ impl Variant {
     ///
     /// If the variants are the same or the source type can be converted to the target type
     /// (via `into`), it generates a successful conversion arm. Otherwise, it generates an error.
-    pub(crate) fn to_try_from_arm(&self, other: &Self, wrapper: &Ident) -> TokenStream {
+    pub(crate) fn try_from_arm_tokens(&self, other: &Self, wrapper: &Ident) -> TokenStream {
         let ident = &self.ident;
         if self.ident == other.ident {
             quote! { #wrapper::#ident(value) => Ok(value), }
@@ -59,7 +59,7 @@ impl Variant {
 
     /// Generates a match arm for calling a function on the variant's value.
     #[allow(clippy::match_wildcard_for_single_variants)]
-    pub(crate) fn to_fn_call_arm(
+    pub(crate) fn fn_call_arm_tokens(
         &self,
         wrapper: &Ident,
         function: &Ident,
@@ -78,7 +78,7 @@ impl Variant {
     }
 
     /// Generates a match arm for retrieving the variant's type as a string.
-    pub(crate) fn to_type_as_str_arm(&self, wrapper: &Ident) -> TokenStream {
+    pub(crate) fn type_as_str_arm_tokens(&self, wrapper: &Ident) -> TokenStream {
         let type_string = self.type_to_string();
         let ident = &self.ident;
         quote! {
@@ -89,7 +89,7 @@ impl Variant {
     /// Generates a match arm for checking if the variant matches a specific type.
     ///
     /// Returns `true` if the variant's type matches the provided type, otherwise an empty arm.
-    pub(crate) fn to_is_type_arm(&self, wrapper: &Ident, ty: &Type) -> TokenStream {
+    pub(crate) fn is_type_arm_tokens(&self, wrapper: &Ident, ty: &Type) -> TokenStream {
         let ident = &self.ident;
         if &self.ty == ty {
             quote! { #wrapper::#ident(_) => true, }
@@ -101,7 +101,7 @@ impl Variant {
     /// Generates a match arm for converting the variant to a specific type.
     ///
     /// Returns `Some(value)` if the variant's type matches or can be converted to the target type.
-    pub(crate) fn to_as_type_arm(&self, wrapper: &Ident, ty: &Type) -> TokenStream {
+    pub(crate) fn as_type_arm_tokens(&self, wrapper: &Ident, ty: &Type) -> TokenStream {
         let ident = &self.ident;
         if &self.ty == ty {
             quote! { #wrapper::#ident(value) => Some(value), }
@@ -115,7 +115,7 @@ impl Variant {
     /// Generates a match arm for borrowing the variant as a reference to a specific type.
     ///
     /// Returns `Some(value)` if the variant's type matches the target type.
-    pub(crate) fn to_as_ref_arm(&self, wrapper: &Ident, ty: &Type) -> TokenStream {
+    pub(crate) fn as_ref_arm_tokens(&self, wrapper: &Ident, ty: &Type) -> TokenStream {
         let ident = &self.ident;
         if &self.ty == ty {
             quote! { #wrapper::#ident(value) => Some(value), }
@@ -127,7 +127,7 @@ impl Variant {
     /// Generates a match arm for mutably borrowing the variant as a specific type.
     ///
     /// Returns `Some(value)` if the variant's type matches the target type.
-    pub(crate) fn to_as_mut_arm(&self, wrapper: &Ident, ty: &Type) -> TokenStream {
+    pub(crate) fn as_mut_arm_tokens(&self, wrapper: &Ident, ty: &Type) -> TokenStream {
         let ident = &self.ident;
         if &self.ty == ty {
             quote! { #wrapper::#ident(value) => Some(value), }
@@ -160,11 +160,7 @@ impl Variant {
     //       - max & min (Ord)
     //
     #[allow(clippy::too_many_lines)]
-    pub(crate) fn generate_vec_methods(
-        &self,
-        enum_ident: &Ident,
-        vec_field: &Ident,
-    ) -> TokenStream {
+    pub(crate) fn vec_methods_tokens(&self, enum_ident: &Ident, vec_field: &Ident) -> TokenStream {
         let ident = &self.ident;
         let ty = &self.ty;
         let snake = self.ident_to_snake();
@@ -336,50 +332,6 @@ impl Variant {
     }
 }
 
-// impl Parse for Variant {
-//     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-//         let attrs_in = input.call(Attribute::parse_outer)?;
-//         let ty = input.parse::<Type>()?;
-//         let (ident, ty) = if input.peek(Paren) {
-//             let content;
-//             parenthesized!(content in input);
-//             (ident_from_type(&ty)?, content.parse::<Type>()?)
-//         } else {
-//             (ident_from_type(&ty)?, ty)
-//         };
-//         let (into, other_attrs) = attrs
-//             .into_iter()
-//             .partition(|attr| attr.path().is_ident("into"));
-//         let into_types = into
-//             .into_iter()
-//             .flat_map(|attr| {
-//                 attr.parse_args_with(Punctuated::<Type, Token![,]>::parse_terminated)
-//                     .map(|p| p.into_iter().collect::<Vec<_>>())
-//                     .unwrap_or_default()
-//             })
-//             .collect::<Vec<_>>();
-//         // let mut into = Vec::new();
-//         // let mut attrs = Vec::new();
-//         // for a in attrs_in {
-//         //     if a.path().is_ident("into") {
-//         //         into = a
-//         //             .parse_args_with(Punctuated::<Type, Token![,]>::parse_terminated)?
-//         //             .iter()
-//         //             .cloned()
-//         //             .collect();
-//         //     } else {
-//         //         attrs.push(a);
-//         //     }
-//         // }
-//         Ok(Self {
-//             attrs,
-//             into,
-//             ident,
-//             ty,
-//         })
-//     }
-// }
-
 impl Parse for Variant {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let attrs = input.call(Attribute::parse_outer)?;
@@ -412,13 +364,6 @@ impl Parse for Variant {
         })
     }
 }
-
-// fn no_ident_err(ty: &Type) -> syn::Result<Ident> {
-//     Err(syn::Error::new(
-//         ty.span(),
-//         "This type can't be used, try defining the variant name",
-//     ))
-// }
 
 pub(crate) fn camel_to_snake(camel: &str) -> String {
     let mut snake = String::new();
@@ -486,85 +431,6 @@ fn camel_case_ident(path: &Path, extension: &str) -> Ident {
     Ident::new(&idents.join(""), path.span())
 }
 
-// /// Generates a CamelCase identifier from a type path with an optional extension.
-// ///
-// /// # Arguments
-// ///
-// /// - `p`: The `syn::Path` to convert (e.g., `std::string::String`).
-// /// - `extension`: A string to append to the generated identifier (e.g., `Ref` for references).
-// ///
-// /// # Returns
-// ///
-// /// A `syn::Ident` representing the CamelCase name (e.g., `String` for `std::string::String`).
-// fn camel_case_ident(p: &syn::Path, extension: &str) -> Ident {
-//     let idents: Option<Vec<String>> = p
-//         .segments
-//         .iter()
-//         .map(|p| {
-//             let ident = p.ident.to_string();
-//             let extra_idents = if let PathArguments::AngleBracketed(args) = &p.arguments {
-//                 let idents = args
-//                     .args
-//                     .iter()
-//                     .filter_map(|a| match a {
-//                         GenericArgument::Type(t) => Some(ident_from_type(t).map(|i| i.to_string())),
-//                         GenericArgument::AssocType(t) => {
-//                             Some(ident_from_type(&t.ty).map(|i| i.to_string()))
-//                         }
-//                         _ => None,
-//                     })
-//                     .collect::<syn::Result<Vec<_>>>();
-//                 if let Ok(vec) = idents {
-//                     vec.concat()
-//                 } else {
-//                     String::new()
-//                 }
-//             } else {
-//                 String::new()
-//             };
-//             let mut chars = ident.chars();
-//             chars.next().map(|first| {
-//                 format!(
-//                     "{}{}{extra_idents}{extension}",
-//                     first.to_uppercase(),
-//                     chars.as_str()
-//                 )
-//             })
-//         })
-//         .collect();
-//     idents
-//         .map(|s| Ident::new(&s.concat(), p.span()))
-//         .expect("Could not generate ident")
-// }
-
-// /// Converts tokens to a CamelCase string representation.
-// ///
-// /// # Arguments
-// ///
-// /// - `t`: something that implements `ToTokens`.
-// ///
-// /// # Returns
-// ///
-// /// A `String` in CamelCase (e.g., `I32` for `i32`).
-// fn camel_case_tokens<T: ToTokens>(t: T) -> String {
-//     let input = t.to_token_stream().to_string();
-//     input
-//         .split_whitespace()
-//         .map(|word| {
-//             let filtered = word
-//                 .chars()
-//                 .filter(|c| c.is_alphanumeric())
-//                 .collect::<String>();
-//             let mut chars = filtered.chars();
-//             chars
-//                 .next()
-//                 .map(|first| format!("{}{}", first.to_uppercase(), chars.as_str()))
-//                 .expect("Could not uppercase first letter")
-//         })
-//         .collect::<Vec<String>>()
-//         .concat()
-// }
-
 /// Converts tokens to a `CamelCase` string representation.
 ///
 /// # Arguments
@@ -611,44 +477,6 @@ fn extract_path(ty: &Type) -> Option<&syn::Path> {
         _ => None,
     }
 }
-
-// fn ident_from_type(ty: &Type) -> syn::Result<Ident> {
-//     match &ty {
-//         Type::Path(TypePath { path, .. }) => Ok(camel_case_ident(path, "")),
-//         Type::Reference(TypeReference { elem, .. }) => {
-//             if let Some(path) = extract_path(elem) {
-//                 Ok(camel_case_ident(path, "Ref"))
-//             } else {
-//                 no_ident_err(ty)
-//             }
-//         }
-//         Type::Array(TypeArray { elem, len, .. }) => {
-//             let ext = format!("Array{}", camel_case_tokens(len));
-//             if let Some(path) = extract_path(elem) {
-//                 Ok(camel_case_ident(path, &ext))
-//             } else {
-//                 no_ident_err(ty)
-//             }
-//         }
-//         Type::Tuple(TypeTuple { elems, .. }) => {
-//             let ident = elems
-//                 .iter()
-//                 .map(|t| extract_path(t).map(|p| camel_case_ident(p, "").to_string()))
-//                 .collect::<Option<Vec<String>>>()
-//                 .map(|mut v| {
-//                     v.push("Tuple".to_string());
-//                     Ident::new(&v.concat(), elems.span())
-//                 });
-//
-//             if let Some(i) = ident {
-//                 Ok(i)
-//             } else {
-//                 no_ident_err(ty)
-//             }
-//         }
-//         _ => Err(syn::Error::new(ty.span(), "This type can't be used")),
-//     }
-// }
 
 /// Generates an `Ident` from a `Type`, used for variant naming.
 ///

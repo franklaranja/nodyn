@@ -13,11 +13,6 @@ use syn::{
 
 use crate::{MethodImpl, OptionalImpl, TraitImpl, Variant, VecWrapper, keyword};
 
-// mod kw {
-//     syn::custom_keyword!(from);
-//     syn::custom_keyword!(str);
-// }
-
 /// Represents the input for the `nodyn` procedural macro, defining a nodyn enum.
 #[derive(Debug, Clone)]
 pub(crate) struct NodynEnum {
@@ -133,6 +128,28 @@ impl Parse for NodynEnum {
 }
 
 impl NodynEnum {
+    pub(crate) fn to_token_stream(&self) -> TokenStream {
+        let enum_definition = self.enum_definition_tokens();
+        let standard_impl = self.standard_impl_tokens();
+        let optional_impl = self.optional_impl_tokens();
+        let methods = self.method_tokens();
+        let traits = self.trait_tokens();
+        let vec_wrappers = self
+            .vec_wrappers
+            .iter()
+            .map(|s| s.to_token_stream(&self))
+            .collect::<Vec<_>>();
+
+        quote! {
+            #enum_definition
+            #standard_impl
+            #optional_impl
+            #(#methods)*
+            #(#traits)*
+            #(#vec_wrappers)*
+        }
+    }
+
     /// Extract `nodyn_path` attribute from provide attributes.
     fn extract_module_path(attrs: &[Attribute]) -> (Option<Path>, Vec<Attribute>) {
         (attrs.iter()
@@ -163,7 +180,7 @@ impl NodynEnum {
     }
 
     /// Generates a `TokenStream` for the generic parameters, combining enum and additional generics.
-    pub(crate) fn to_merged_generics(&self, other: &Generics) -> TokenStream {
+    pub(crate) fn merged_generics_tokens(&self, other: &Generics) -> TokenStream {
         let params = self
             .generics
             .params
@@ -178,7 +195,7 @@ impl NodynEnum {
     }
 
     /// Generates a `TokenStream` for generic parameters with an additional parameter.
-    pub(crate) fn to_merged_generics_and_param(
+    pub(crate) fn merged_generics_and_param_tokens(
         &self,
         generics: &Generics,
         param: &GenericParam,
@@ -199,7 +216,7 @@ impl NodynEnum {
     }
 
     /// Generates a `TokenStream` for the enum's generic parameters.
-    pub(crate) fn to_generics(&self) -> TokenStream {
+    pub(crate) fn generics_tokens(&self) -> TokenStream {
         let generics = self.generics.params.iter().collect::<Vec<_>>();
         if generics.is_empty() {
             TokenStream::new()
@@ -208,7 +225,7 @@ impl NodynEnum {
         }
     }
 
-    pub(crate) fn to_generics_and_param(&self, param: &GenericParam) -> TokenStream {
+    pub(crate) fn generics_and_param_tokens(&self, param: &GenericParam) -> TokenStream {
         let mut generics = self.generics.params.iter().collect::<Vec<_>>();
         generics.push(param);
         if generics.is_empty() {
@@ -218,7 +235,7 @@ impl NodynEnum {
         }
     }
 
-    pub(crate) fn to_where_and_predicate(&self, predicate: &WherePredicate) -> TokenStream {
+    pub(crate) fn where_and_predicate_tokens(&self, predicate: &WherePredicate) -> TokenStream {
         let mut where_clause = if let Some(clause) = &self.generics.where_clause {
             clause.predicates.iter().collect::<Vec<_>>()
         } else {
@@ -232,7 +249,7 @@ impl NodynEnum {
         }
     }
 
-    pub(crate) fn to_merged_where(&self, generics: &Generics) -> TokenStream {
+    pub(crate) fn merged_where_tokens(&self, generics: &Generics) -> TokenStream {
         // (Option<&'static str>, Vec<&'a WherePredicate>) {
         let predicates = match (&self.generics.where_clause, &generics.where_clause) {
             (Some(w), None) | (None, Some(w)) => w.predicates.iter().collect::<Vec<_>>(),
@@ -247,7 +264,7 @@ impl NodynEnum {
         quote! {where #(#predicates ,)* }
     }
 
-    pub(crate) fn to_merged_where_and_predicate(
+    pub(crate) fn merged_where_and_predicate_tokens(
         &self,
         generics: &Generics,
         predicate: &WherePredicate,
@@ -266,8 +283,8 @@ impl NodynEnum {
         quote! {where #(#predicates ,)* }
     }
 
-    pub(crate) fn to_enum_definition(&self) -> TokenStream {
-        let variants = self.variants.iter().map(Variant::to_enum_variant);
+    pub(crate) fn enum_definition_tokens(&self) -> TokenStream {
+        let variants = self.variants.iter().map(Variant::enum_variant_tokens);
         let attrs = &self.attrs;
         let visibility = &self.visibility;
         let ident = &self.ident;
@@ -281,7 +298,8 @@ impl NodynEnum {
         }
     }
 
-    pub(crate) fn to_from_impls(&self) -> Vec<TokenStream> {
+    #[allow(clippy::wrong_self_convention)]
+    pub(crate) fn from_tokens(&self) -> Vec<TokenStream> {
         let ident = &self.ident;
         let generics = &self.generics;
         self.variants
@@ -300,7 +318,7 @@ impl NodynEnum {
             .collect()
     }
 
-    pub(crate) fn to_try_from_impls(&self) -> Vec<TokenStream> {
+    pub(crate) fn try_from_tokens(&self) -> Vec<TokenStream> {
         let ident = &self.ident;
         let generics = &self.generics;
         self.variants
@@ -310,7 +328,7 @@ impl NodynEnum {
                 let arms: Vec<TokenStream> = self
                     .variants
                     .iter()
-                    .map(|inner| inner.to_try_from_arm(outer, ident))
+                    .map(|inner| inner.try_from_arm_tokens(outer, ident))
                     .collect();
                 quote! {
                     impl #generics ::core::convert::TryFrom<#ident #generics> for #ty {
@@ -328,7 +346,7 @@ impl NodynEnum {
     }
 
     /// Generate delegation methods for shared methods.
-    pub(crate) fn to_method_impls(&self) -> Vec<TokenStream> {
+    pub(crate) fn method_tokens(&self) -> Vec<TokenStream> {
         let ident = &self.ident;
         let generics = &self.generics;
         self.method_impls
@@ -343,7 +361,7 @@ impl NodynEnum {
                             let arms = self
                                 .variants
                                 .iter()
-                                .map(|v| v.to_fn_call_arm(ident, &f.sig.ident, &f.sig.inputs));
+                                .map(|v| v.fn_call_arm_tokens(ident, &f.sig.ident, &f.sig.inputs));
                             let attrs = &f.attrs;
                             let vis = &f.vis;
                             let signature = &f.sig;
@@ -371,7 +389,7 @@ impl NodynEnum {
             .collect()
     }
 
-    pub(crate) fn to_trait_impls(&self) -> Vec<TokenStream> {
+    pub(crate) fn trait_tokens(&self) -> Vec<TokenStream> {
         let wrapper = &self.ident;
         let lt = &self.generics;
         self.trait_impls
@@ -379,7 +397,7 @@ impl NodynEnum {
             .map(|b| {
                 let trait_path = &b.path;
                 let items = &b.block.items;
-                let fns = b.block.expand_methods(self);
+                let fns = b.block.expand_methods_tokens(self);
                 quote! {
                     impl #lt #trait_path for #wrapper #lt {
                          #(#items)*
@@ -391,7 +409,7 @@ impl NodynEnum {
     }
 
     /// Generates type introspection methods (`count`, `types`, `type_name`).
-    fn to_introspection_methods(&self) -> TokenStream {
+    fn introspection_tokens(&self) -> TokenStream {
         let ident = &self.ident;
         let generics = &self.generics;
         let visibility = &self.visibility;
@@ -401,7 +419,10 @@ impl NodynEnum {
             .iter()
             .map(Variant::type_to_string)
             .collect::<Vec<_>>();
-        let arms = self.variants.iter().map(|v| v.to_type_as_str_arm(ident));
+        let arms = self
+            .variants
+            .iter()
+            .map(|v| v.type_as_str_arm_tokens(ident));
 
         quote! {
             impl #generics #ident #generics {
@@ -428,7 +449,7 @@ impl NodynEnum {
     /// Generates type checking and conversion methods (`is_`, `try_as_`, etc.).
     ///
     /// Skips `try_as_ref` and `try_as_mut` for reference types to avoid redundant implementations.
-    fn to_is_as_methods(&self) -> syn::Result<TokenStream> {
+    fn is_as_tokens(&self) -> syn::Result<TokenStream> {
         let ident = &self.ident;
         let generics = &self.generics;
         let methods = self
@@ -441,11 +462,17 @@ impl NodynEnum {
 
                 let is_fn = format_ident!("is_{}", snake);
                 let is_doc = format!("Returns `true` if the variant is `{type_name}`.");
-                let is_arms = self.variants.iter().map(|v| v.to_is_type_arm(ident, ty));
+                let is_arms = self
+                    .variants
+                    .iter()
+                    .map(|v| v.is_type_arm_tokens(ident, ty));
 
                 let as_fn = format_ident!("try_as_{}", snake);
                 let as_doc = format!("Converts to `Option<{type_name}>` if possible.");
-                let as_arms = self.variants.iter().map(|v| v.to_as_type_arm(ident, ty));
+                let as_arms = self
+                    .variants
+                    .iter()
+                    .map(|v| v.as_type_arm_tokens(ident, ty));
 
                 let ref_mut_methods = if matches!(ty, Type::Reference(_)) {
                     quote! {}
@@ -453,13 +480,13 @@ impl NodynEnum {
                     let as_ref_fn = format_ident!("try_as_{}_ref", snake);
                     let as_ref_doc =
                         format!("Returns `Option<&{type_name}>` if the variant is `{type_name}`.");
-                    let as_ref_arms = self.variants.iter().map(|v| v.to_as_ref_arm(ident, ty));
+                    let as_ref_arms = self.variants.iter().map(|v| v.as_ref_arm_tokens(ident, ty));
 
                     let as_mut_fn = format_ident!("try_as_{}_mut", snake);
                     let as_mut_doc = format!(
                         "Returns `Option<&mut {type_name}>` if the variant is `{type_name}`."
                     );
-                    let as_mut_arms = self.variants.iter().map(|v| v.to_as_mut_arm(ident, ty));
+                    let as_mut_arms = self.variants.iter().map(|v| v.as_mut_arm_tokens(ident, ty));
 
                     quote! {
                         #[doc = #as_ref_doc]
@@ -514,19 +541,19 @@ impl NodynEnum {
         let methods = self
             .variants
             .iter()
-            .map(|v| v.generate_vec_methods(&self.ident, vec_field));
+            .map(|v| v.vec_methods_tokens(&self.ident, vec_field));
         quote! { #(#methods)* }
     }
 
     /// returns a `TokenStream` that is always included
-    pub(crate) fn to_standard_impl(&self) -> TokenStream {
-        let from = self.to_from_impls();
+    pub(crate) fn standard_impl_tokens(&self) -> TokenStream {
+        let from = self.from_tokens();
         quote! {
             #(#from)*
         }
     }
 
-    pub(crate) fn to_optional_impl(&self) -> TokenStream {
+    pub(crate) fn optional_impl_tokens(&self) -> TokenStream {
         if self.optional_impl.none() {
             // depreciated feature flags only if no features are set
             #[cfg(feature = "try_into")]
@@ -542,17 +569,17 @@ impl NodynEnum {
                 "Warning: The `is_as` cargo feature is deprecated. Use `impl is_as` in the nodyn! macro."
             );
             #[cfg(feature = "try_into")]
-            let try_into = self.to_try_from_impls();
+            let try_into = self.try_from_tokens();
             #[cfg(not(feature = "try_into"))]
             let try_into = Vec::<proc_macro2::TokenStream>::new();
 
             #[cfg(feature = "introspection")]
-            let type_fns = self.to_introspection_methods();
+            let type_fns = self.introspection_tokens();
             #[cfg(not(feature = "introspection"))]
             let type_fns = proc_macro2::TokenStream::new();
 
             #[cfg(feature = "is_as")]
-            let is_as_fn = self.to_is_as_methods().unwrap();
+            let is_as_fn = self.is_as_tokens().unwrap();
             #[cfg(not(feature = "is_as"))]
             let is_as_fn = proc_macro2::TokenStream::new();
 
@@ -563,17 +590,17 @@ impl NodynEnum {
             }
         } else {
             let try_into = if self.optional_impl.try_into {
-                self.to_try_from_impls()
+                self.try_from_tokens()
             } else {
                 Vec::new()
             };
             let type_fns = if self.optional_impl.introspection {
-                self.to_introspection_methods()
+                self.introspection_tokens()
             } else {
                 proc_macro2::TokenStream::new()
             };
             let is_as_fn = if self.optional_impl.is_as {
-                self.to_is_as_methods().unwrap()
+                self.is_as_tokens().unwrap()
             } else {
                 proc_macro2::TokenStream::new()
             };

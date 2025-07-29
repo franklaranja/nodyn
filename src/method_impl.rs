@@ -47,7 +47,7 @@ impl Parse for MethodImpl {
 }
 
 impl MethodImpl {
-    pub(crate) fn expand_methods(&self, wrapper: &NodynEnum) -> Vec<TokenStream> {
+    pub(crate) fn expand_methods_tokens(&self, wrapper: &NodynEnum) -> Vec<TokenStream> {
         self.functions
             .iter()
             .map(|f| {
@@ -55,7 +55,7 @@ impl MethodImpl {
                     let arms = wrapper
                         .variants
                         .iter()
-                        .map(|v| v.to_fn_call_arm(&wrapper.ident, &f.sig.ident, &f.sig.inputs));
+                        .map(|v| v.fn_call_arm_tokens(&wrapper.ident, &f.sig.ident, &f.sig.inputs));
                     let attrs = &f.attrs;
                     let vis = &f.vis;
                     let signature = &f.sig;
