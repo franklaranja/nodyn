@@ -537,7 +537,7 @@ impl NodynEnum {
     }
 
     /// Generates vector accessor methods for a given `Vec` field in a vec wrapper.
-    fn variant_vec_tokens(&self, vec_field: &Ident) -> TokenStream {
+    pub(crate) fn variant_vec_tokens(&self, vec_field: &Ident) -> TokenStream {
         let methods = self
             .variants
             .iter()

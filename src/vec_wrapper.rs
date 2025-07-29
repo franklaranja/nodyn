@@ -771,6 +771,7 @@ impl VecWrapper {
         let where_clause = self.where_tokens(nodyn);
         let enum_generics = nodyn.generics_tokens();
         let new_type = &nodyn.generics.new_type();
+        let default_fields = self.default_fields();
         let variants = nodyn.variants.iter().map(|variant| {
             let ty = &variant.ty;
             quote!{
@@ -778,7 +779,7 @@ impl VecWrapper {
                     fn from(v: ::std::vec::Vec<#ty>) -> Self {
                         Self {
                             #field: v.into_iter().map(#enum_ident::from).collect(),
-                            ..::core::default::Default::default()
+                            #default_fields
                         }
                     }
                 }
@@ -792,7 +793,7 @@ impl VecWrapper {
                 fn from(v: ::std::vec::Vec<#enum_ident #enum_generics>) -> Self {
                     Self {
                         #field: v,
-                        ..::core::default::Default::default()
+                        #default_fields
                     }
                 }
             }
@@ -801,7 +802,7 @@ impl VecWrapper {
                 fn from_iter<#new_type: ::core::iter::IntoIterator<Item = #enum_ident #enum_generics>>(iter: #new_type) -> Self {
                     Self {
                         #field: ::std::vec::Vec::from_iter(iter),
-                        ..::core::default::Default::default()
+                        #default_fields
                     }
                 }
             }
@@ -820,7 +821,7 @@ impl VecWrapper {
                 #visibility fn with_capacity(capacity: usize) -> Self {
                     Self {
                         #field: ::std::vec::Vec::with_capacity(capacity),
-                        ..::core::default::Default::default()
+                        #default_fields
                     }
                 }
 
@@ -829,7 +830,7 @@ impl VecWrapper {
                 #visibility fn split_off(&mut self, at: usize) -> Self {
                     Self {
                         #field: self.#field.split_off(at),
-                        ..::core::default::Default::default()
+                        #default_fields
                     }
                 }
             }
@@ -979,6 +980,7 @@ impl VecWrapper {
         let generics = self.generics_tokens(nodyn);
         let where_clause = self.where_tokens(nodyn);
         let enum_generics = nodyn.generics_tokens();
+        let default_fields = self.default_fields();
 
         let variants = nodyn.variants.iter().map(|variant| {
             let ty = &variant.ty;
@@ -987,7 +989,7 @@ impl VecWrapper {
                     fn from(s: &[#ty]) -> #ident #generics {
                         Self {
                            #field: s.iter().cloned().map(#enum_ident::from).collect(),
-                            ..::core::default::Default::default()
+                           #default_fields
                         }
                     }
                 }
@@ -996,7 +998,7 @@ impl VecWrapper {
                     fn from(s: &mut [#ty]) -> #ident #generics {
                         Self {
                            #field: s.iter().cloned().map(#enum_ident::from).collect(),
-                            ..::core::default::Default::default()
+                           #default_fields
                         }
                     }
                 }
@@ -1008,7 +1010,7 @@ impl VecWrapper {
                 fn from(s: &[#enum_ident #enum_generics]) -> #ident #generics {
                     Self {
                        #field: s.to_vec(),
-                        ..::core::default::Default::default()
+                        #default_fields
                     }
                 }
             }
@@ -1017,7 +1019,7 @@ impl VecWrapper {
                 fn from(s: &mut [#enum_ident #enum_generics]) -> #ident #generics {
                     Self {
                        #field: s.to_vec(),
-                        ..::core::default::Default::default()
+                       #default_fields
                     }
                 }
             }
@@ -1184,6 +1186,14 @@ impl VecWrapper {
                 nodyn.generics_and_param_tokens(extra1),
                 nodyn.where_and_predicate_tokens(extra2),
             )
+        }
+    }
+
+    fn default_fields(&self) -> TokenStream {
+        if self.is_custom {
+            quote! { .. ::core::default::Default::default() }
+        } else {
+            TokenStream::new()
         }
     }
 }
