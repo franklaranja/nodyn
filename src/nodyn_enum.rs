@@ -4,8 +4,7 @@ use std::collections::HashSet;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
 use syn::{
-    Attribute, FnArg, GenericParam, Generics, Ident, Meta, Path, Token, Type, Visibility,
-    WherePredicate,
+    Attribute, FnArg, Generics, Ident, Meta, Path, Token, Type, Visibility, WherePredicate,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     spanned::Spanned,
@@ -194,40 +193,9 @@ impl NodynEnum {
         }
     }
 
-    /// Generates a `TokenStream` for generic parameters with an additional parameter.
-    pub(crate) fn merged_generics_and_param_tokens(
-        &self,
-        generics: &Generics,
-        param: &GenericParam,
-    ) -> TokenStream {
-        let mut generics = self
-            .generics
-            .params
-            .iter()
-            .chain(generics.params.iter())
-            .collect::<Vec<_>>();
-        generics.push(param);
-
-        if generics.is_empty() {
-            TokenStream::new()
-        } else {
-            quote! { <#(#generics,)*> }
-        }
-    }
-
     /// Generates a `TokenStream` for the enum's generic parameters.
     pub(crate) fn generics_tokens(&self) -> TokenStream {
         let generics = self.generics.params.iter().collect::<Vec<_>>();
-        if generics.is_empty() {
-            TokenStream::new()
-        } else {
-            quote! { <#(#generics,)*> }
-        }
-    }
-
-    pub(crate) fn generics_and_param_tokens(&self, param: &GenericParam) -> TokenStream {
-        let mut generics = self.generics.params.iter().collect::<Vec<_>>();
-        generics.push(param);
         if generics.is_empty() {
             TokenStream::new()
         } else {

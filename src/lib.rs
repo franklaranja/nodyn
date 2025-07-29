@@ -742,7 +742,8 @@
 //! }
 
 use proc_macro::TokenStream;
-use syn::parse_macro_input;
+use proc_macro2::{Ident, Span};
+use syn::{GenericParam, Generics, Lifetime, parse_macro_input};
 
 mod method_impl;
 mod nodyn_enum;
@@ -773,9 +774,6 @@ pub(crate) mod keyword {
     syn::custom_keyword!(introspection);
 }
 
-use proc_macro2::{Ident, Span};
-use syn::{Generics, Lifetime};
-
 /// Extension trait for managing generics in macro code generation.
 pub(crate) trait GenericsExt {
     /// Checks if the generics include a specific lifetime.
@@ -788,6 +786,10 @@ pub(crate) trait GenericsExt {
     fn new_type(&self) -> Ident;
     /// Generates multiple new, unused type identifiers.
     fn new_types(&self, count: u8) -> Vec<Ident>;
+    fn type_generics_tokens(&self) -> proc_macro2::TokenStream;
+    fn merged_type_generics_tokens(&self, other: &Self) -> proc_macro2::TokenStream;
+    fn merged_generics_tokens(&self, other: &Self) -> proc_macro2::TokenStream;
+    fn merged2_generics_tokens(&self, other1: &Self, other2: &Self) -> proc_macro2::TokenStream;
 }
 
 impl GenericsExt for Generics {
@@ -834,5 +836,138 @@ impl GenericsExt for Generics {
             }
         }
         result
+    }
+
+    fn type_generics_tokens(&self) -> proc_macro2::TokenStream {
+        let (_, type_generics, _) = self.split_for_impl();
+        quote::quote! { #type_generics }
+    }
+
+    fn merged_type_generics_tokens(&self, other: &Self) -> proc_macro2::TokenStream {
+        let lifetimes = self
+            .params
+            .iter()
+            .filter_map(|parameter| {
+                if let GenericParam::Lifetime(lifetime) = parameter {
+                    Some(&lifetime.lifetime)
+                } else {
+                    None
+                }
+            })
+            .chain(other.params.iter().filter_map(|parameter| {
+                if let GenericParam::Lifetime(lifetime) = parameter {
+                    Some(&lifetime.lifetime)
+                } else {
+                    None
+                }
+            }))
+            .collect::<Vec<_>>();
+        let types = self
+            .params
+            .iter()
+            .filter_map(|parameter| {
+                if let GenericParam::Type(ty) = parameter {
+                    Some(&ty.ident)
+                } else {
+                    None
+                }
+            })
+            .chain(other.params.iter().filter_map(|parameter| {
+                if let GenericParam::Type(ty) = parameter {
+                    Some(&ty.ident)
+                } else {
+                    None
+                }
+            }))
+            .collect::<Vec<_>>();
+        if lifetimes.is_empty() && types.is_empty() {
+            proc_macro2::TokenStream::new()
+        } else if lifetimes.is_empty() {
+            quote::quote! { < #(#types,)* >}
+        } else if types.is_empty() {
+            quote::quote! { < #(#lifetimes,)* >}
+        } else {
+            quote::quote! { < #(#lifetimes,)* #(#types,)* > }
+        }
+    }
+
+    fn merged_generics_tokens(&self, other: &Self) -> proc_macro2::TokenStream {
+        let lifetimes = self
+            .params
+            .iter()
+            .filter(|p| matches!(p, GenericParam::Lifetime(_)))
+            .chain(
+                other
+                    .params
+                    .iter()
+                    .filter(|p| matches!(p, GenericParam::Lifetime(_))),
+            )
+            .collect::<Vec<_>>();
+        let types = self
+            .params
+            .iter()
+            .filter(|p| matches!(p, GenericParam::Type(_)))
+            .chain(
+                other
+                    .params
+                    .iter()
+                    .filter(|p| matches!(p, GenericParam::Type(_))),
+            )
+            .collect::<Vec<_>>();
+        if lifetimes.is_empty() && types.is_empty() {
+            proc_macro2::TokenStream::new()
+        } else if lifetimes.is_empty() {
+            quote::quote! { < #(#types,)* >}
+        } else if types.is_empty() {
+            quote::quote! { < #(#lifetimes,)* >}
+        } else {
+            quote::quote! { < #(#lifetimes,)* #(#types,)* > }
+        }
+    }
+
+    fn merged2_generics_tokens(&self, other1: &Self, other2: &Self) -> proc_macro2::TokenStream {
+        let lifetimes = self
+            .params
+            .iter()
+            .filter(|p| matches!(p, GenericParam::Lifetime(_)))
+            .chain(
+                other1
+                    .params
+                    .iter()
+                    .filter(|p| matches!(p, GenericParam::Lifetime(_))),
+            )
+            .chain(
+                other2
+                    .params
+                    .iter()
+                    .filter(|p| matches!(p, GenericParam::Lifetime(_))),
+            )
+            .collect::<Vec<_>>();
+        let types = self
+            .params
+            .iter()
+            .filter(|p| matches!(p, GenericParam::Type(_)))
+            .chain(
+                other1
+                    .params
+                    .iter()
+                    .filter(|p| matches!(p, GenericParam::Type(_))),
+            )
+            .chain(
+                other2
+                    .params
+                    .iter()
+                    .filter(|p| matches!(p, GenericParam::Type(_))),
+            )
+            .collect::<Vec<_>>();
+        if lifetimes.is_empty() && types.is_empty() {
+            proc_macro2::TokenStream::new()
+        } else if lifetimes.is_empty() {
+            quote::quote! { < #(#types,)* >}
+        } else if types.is_empty() {
+            quote::quote! { < #(#lifetimes,)* >}
+        } else {
+            quote::quote! { < #(#lifetimes,)* #(#types,)* > }
+        }
     }
 }
