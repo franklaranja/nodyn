@@ -3,7 +3,7 @@ use proc_macro2::{Ident, Span, TokenStream, TokenTree};
 use quote::{ToTokens, quote};
 use syn::spanned::Spanned;
 use syn::{
-    Attribute, Fields, GenericParam, Generics, ItemStruct, Meta, Token, Visibility, WherePredicate,
+    Attribute, Fields, Generics, ItemStruct, Meta, Token, Visibility, WherePredicate,
     parse::{Parse, ParseStream, Parser},
     parse_quote,
     punctuated::Punctuated,
@@ -171,9 +171,10 @@ impl VecWrapper {
         let partial_eq_methods = &self.partial_eq_methods_tokens();
         let field = &self.vec_field;
         let variant_methods = nodyn.variant_vec_tokens(field);
+        let type_generics = self.merged_type_generics_tokens(nodyn);
 
         quote! {
-            impl #generics #ident #generics #where_clause {
+            impl #generics #ident #type_generics #where_clause {
                 #delegated_methods
                 #modified_methods
                 #partial_eq_methods
@@ -656,7 +657,7 @@ impl VecWrapper {
         let where_clause = self.where_tokens(nodyn);
         let enum_generics = nodyn.generics_tokens();
         let new_type = nodyn.generics.new_type();
-        let index_g: GenericParam = parse_quote! {#new_type};
+        let index_g: Generics = parse_quote! {<#new_type>};
         let index_w: WherePredicate = parse_quote! {
             #new_type: ::core::slice::SliceIndex<[#enum_ident #enum_generics]>
         };
@@ -665,31 +666,33 @@ impl VecWrapper {
 
         let lt = &nodyn.generics.new_lifetime();
         let (lt_generics, _) = {
-            let index_g: GenericParam = parse_quote! {#lt};
+            let index_g: Generics = parse_quote! {<#lt>};
             let index_w: WherePredicate = parse_quote! {W: Clone};
             self.merge_generics(nodyn, &index_g, &index_w)
         };
+        let type_generics = self.merged_type_generics_tokens(nodyn);
+
         quote! {
-            impl #generics ::core::convert::From<#ident #generics> for ::std::vec::Vec<#enum_ident #enum_generics> #where_clause {
-                fn from(v: #ident #generics) -> ::std::vec::Vec<#enum_ident #enum_generics> {
+            impl #generics ::core::convert::From<#ident #type_generics> for ::std::vec::Vec<#enum_ident #enum_generics> #where_clause {
+                fn from(v: #ident #type_generics) -> ::std::vec::Vec<#enum_ident #enum_generics> {
                     v.#field
                 }
             }
 
-            impl #index_generics ::core::ops::Index<#new_type> for #ident #generics #index_where {
+            impl #index_generics ::core::ops::Index<#new_type> for #ident #type_generics #index_where {
                 type Output = #new_type::Output;
                 fn index(&self, index: #new_type) -> &Self::Output {
                     &self.#field[index]
                 }
             }
 
-            impl #index_generics ::core::ops::IndexMut<#new_type> for #ident #generics #index_where {
+            impl #index_generics ::core::ops::IndexMut<#new_type> for #ident #type_generics #index_where {
                 fn index_mut(&mut self, index: #new_type) -> &mut Self::Output {
                     &mut self.#field[index]
                 }
             }
 
-            impl #lt_generics ::core::iter::IntoIterator for &#lt #ident #generics #where_clause {
+            impl #lt_generics ::core::iter::IntoIterator for &#lt #ident #type_generics #where_clause {
                 type Item = &#lt #enum_ident #enum_generics;
                 type IntoIter = ::core::slice::Iter<#lt, #enum_ident #enum_generics>;
                 fn into_iter(self) -> Self::IntoIter {
@@ -697,7 +700,7 @@ impl VecWrapper {
                 }
             }
 
-            impl #lt_generics ::core::iter::IntoIterator for &#lt mut #ident #generics #where_clause {
+            impl #lt_generics ::core::iter::IntoIterator for &#lt mut #ident #type_generics #where_clause {
                 type Item = &#lt mut #enum_ident #enum_generics;
                 type IntoIter = ::core::slice::IterMut<#lt, #enum_ident #enum_generics>;
                 fn into_iter(self) -> Self::IntoIter {
@@ -705,7 +708,7 @@ impl VecWrapper {
                 }
             }
 
-            impl #generics ::core::iter::IntoIterator for #ident #generics #where_clause {
+            impl #generics ::core::iter::IntoIterator for #ident #type_generics #where_clause {
                 type Item = #enum_ident #enum_generics;
                 type IntoIter = ::std::vec::IntoIter<#enum_ident #enum_generics>;
                 fn into_iter(self) -> Self::IntoIter {
@@ -713,37 +716,37 @@ impl VecWrapper {
                 }
             }
 
-            impl #generics ::core::convert::AsRef<#ident #generics> for #ident #generics #where_clause {
+            impl #generics ::core::convert::AsRef<#ident #type_generics> for #ident #type_generics #where_clause {
                 fn as_ref(&self) -> &Self {
                     self
                 }
             }
 
-            impl #generics ::core::convert::AsMut<#ident #generics> for #ident #generics #where_clause {
+            impl #generics ::core::convert::AsMut<#ident #type_generics> for #ident #type_generics #where_clause {
                 fn as_mut(&mut self) -> &mut Self {
                     self
                 }
             }
 
-            impl #generics ::core::convert::AsRef<::std::vec::Vec<#enum_ident #enum_generics>> for #ident #generics #where_clause {
+            impl #generics ::core::convert::AsRef<::std::vec::Vec<#enum_ident #enum_generics>> for #ident #type_generics #where_clause {
                 fn as_ref(&self) -> &::std::vec::Vec<#enum_ident #enum_generics> {
                     &self.#field
                 }
             }
 
-            impl #generics ::core::convert::AsMut<::std::vec::Vec<#enum_ident #enum_generics>> for #ident #generics #where_clause {
+            impl #generics ::core::convert::AsMut<::std::vec::Vec<#enum_ident #enum_generics>> for #ident #type_generics #where_clause {
                 fn as_mut(&mut self) -> &mut ::std::vec::Vec<#enum_ident #enum_generics> {
                     &mut self.#field
                 }
             }
 
-            impl #generics ::core::convert::AsRef<[#enum_ident #enum_generics]> for #ident #generics #where_clause {
+            impl #generics ::core::convert::AsRef<[#enum_ident #enum_generics]> for #ident #type_generics #where_clause {
                 fn as_ref(&self) -> &[#enum_ident #enum_generics] {
                     &self.#field
                 }
             }
 
-            impl #generics ::core::convert::AsMut<[#enum_ident #enum_generics]> for #ident #generics #where_clause {
+            impl #generics ::core::convert::AsMut<[#enum_ident #enum_generics]> for #ident #type_generics #where_clause {
                 fn as_mut(&mut self) -> &mut [#enum_ident #enum_generics] {
                     &mut self.#field
                 }
@@ -772,10 +775,11 @@ impl VecWrapper {
         let enum_generics = nodyn.generics_tokens();
         let new_type = &nodyn.generics.new_type();
         let default_fields = self.default_fields();
+        let type_generics = self.merged_type_generics_tokens(nodyn);
         let variants = nodyn.variants.iter().map(|variant| {
             let ty = &variant.ty;
             quote!{
-                impl #generics ::core::convert::From<::std::vec::Vec<#ty>> for #ident #generics #where_clause {
+                impl #generics ::core::convert::From<::std::vec::Vec<#ty>> for #ident #type_generics #where_clause {
                     fn from(v: ::std::vec::Vec<#ty>) -> Self {
                         Self {
                             #field: v.into_iter().map(#enum_ident::from).collect(),
@@ -789,7 +793,7 @@ impl VecWrapper {
         let vec_macro = self.macro_tokens(nodyn);
 
         quote! {
-            impl #generics ::core::convert::From<::std::vec::Vec<#enum_ident #enum_generics>> for #ident #generics #where_clause {
+            impl #generics ::core::convert::From<::std::vec::Vec<#enum_ident #enum_generics>> for #ident #type_generics #where_clause {
                 fn from(v: ::std::vec::Vec<#enum_ident #enum_generics>) -> Self {
                     Self {
                         #field: v,
@@ -798,7 +802,7 @@ impl VecWrapper {
                 }
             }
 
-            impl #generics ::core::iter::FromIterator<#enum_ident #enum_generics> for #ident #generics #where_clause {
+            impl #generics ::core::iter::FromIterator<#enum_ident #enum_generics> for #ident #type_generics #where_clause {
                 fn from_iter<#new_type: ::core::iter::IntoIterator<Item = #enum_ident #enum_generics>>(iter: #new_type) -> Self {
                     Self {
                         #field: ::std::vec::Vec::from_iter(iter),
@@ -809,7 +813,7 @@ impl VecWrapper {
 
             #(#variants)*
 
-            impl #generics #ident #generics #where_clause {
+            impl #generics #ident #type_generics #where_clause {
                 /// Creates a new empty wrapper.
                 /// See [`Vec::new`].
                 #visibility fn new() -> Self {
@@ -860,11 +864,12 @@ impl VecWrapper {
         let enum_ident = &nodyn.ident;
         let enum_generics = nodyn.generics_tokens();
         let new_type = &nodyn.generics.new_type();
+        let type_generics = self.merged_type_generics_tokens(nodyn);
 
         let variants = nodyn.variants.iter().map(|variant| {
             let ty = &variant.ty;
             quote!{
-                impl #generics ::core::iter::Extend<#ty> for #ident #generics #where_clause {
+                impl #generics ::core::iter::Extend<#ty> for #ident #type_generics #where_clause {
                     fn extend<#new_type: ::core::iter::IntoIterator<Item = #ty>>(&mut self, iter: #new_type) {
                         self.#field.extend(iter.into_iter().map(#enum_ident::from))
                     }
@@ -873,7 +878,7 @@ impl VecWrapper {
         }).collect::<Vec<_>>();
 
         quote! {
-            impl #generics ::core::iter::Extend<#enum_ident #enum_generics> for #ident #generics #where_clause {
+            impl #generics ::core::iter::Extend<#enum_ident #enum_generics> for #ident #type_generics #where_clause {
                 fn extend<#new_type: ::core::iter::IntoIterator<Item = #enum_ident #enum_generics>>(&mut self, iter: #new_type) {
                     self.#field.extend(iter.into_iter())
                 }
@@ -881,7 +886,7 @@ impl VecWrapper {
 
             #(#variants)*
 
-            impl #generics #ident #generics #where_clause {
+            impl #generics #ident #type_generics #where_clause {
                 /// Resizes the vector to the new length, using the provided value.
                 /// Accepts `Into<Enum>` for the value.
                 /// See [`Vec::resize`].
@@ -981,12 +986,13 @@ impl VecWrapper {
         let where_clause = self.where_tokens(nodyn);
         let enum_generics = nodyn.generics_tokens();
         let default_fields = self.default_fields();
+        let type_generics = self.merged_type_generics_tokens(nodyn);
 
         let variants = nodyn.variants.iter().map(|variant| {
             let ty = &variant.ty;
             quote!{
-                impl #generics ::core::convert::From<&[#ty]> for #ident #generics #where_clause {
-                    fn from(s: &[#ty]) -> #ident #generics {
+                impl #generics ::core::convert::From<&[#ty]> for #ident #type_generics #where_clause {
+                    fn from(s: &[#ty]) -> #ident #type_generics {
                         Self {
                            #field: s.iter().cloned().map(#enum_ident::from).collect(),
                            #default_fields
@@ -994,8 +1000,8 @@ impl VecWrapper {
                     }
                 }
 
-                impl #generics ::core::convert::From<&mut [#ty]> for #ident #generics #where_clause {
-                    fn from(s: &mut [#ty]) -> #ident #generics {
+                impl #generics ::core::convert::From<&mut [#ty]> for #ident #type_generics #where_clause {
+                    fn from(s: &mut [#ty]) -> #ident #type_generics {
                         Self {
                            #field: s.iter().cloned().map(#enum_ident::from).collect(),
                            #default_fields
@@ -1006,8 +1012,8 @@ impl VecWrapper {
         }).collect::<Vec<_>>();
 
         quote! {
-            impl #generics ::core::convert::From<&[#enum_ident #enum_generics]> for #ident #generics #where_clause {
-                fn from(s: &[#enum_ident #enum_generics]) -> #ident #generics {
+            impl #generics ::core::convert::From<&[#enum_ident #enum_generics]> for #ident #type_generics #where_clause {
+                fn from(s: &[#enum_ident #enum_generics]) -> #ident #type_generics {
                     Self {
                        #field: s.to_vec(),
                         #default_fields
@@ -1015,8 +1021,8 @@ impl VecWrapper {
                 }
             }
 
-            impl #generics ::core::convert::From<&mut [#enum_ident #enum_generics]> for #ident #generics #where_clause {
-                fn from(s: &mut [#enum_ident #enum_generics]) -> #ident #generics {
+            impl #generics ::core::convert::From<&mut [#enum_ident #enum_generics]> for #ident #type_generics #where_clause {
+                fn from(s: &mut [#enum_ident #enum_generics]) -> #ident #type_generics {
                     Self {
                        #field: s.to_vec(),
                        #default_fields
@@ -1039,11 +1045,12 @@ impl VecWrapper {
         let generics = self.generics_tokens(nodyn);
         let where_clause = self.where_tokens(nodyn);
         let visibility = &self.definition.vis;
+        let type_generics = self.merged_type_generics_tokens(nodyn);
 
         quote! {
             /// Checks if the elements of this slice are sorted.
             /// See [`Vec::is_sorted`].
-            impl #generics #ident #generics #where_clause {
+            impl #generics #ident #type_generics #where_clause {
                 #visibility fn is_sorted(&self) -> bool {
                     self.#field.is_sorted()
                 }
@@ -1067,11 +1074,12 @@ impl VecWrapper {
         let visibility = &self.definition.vis;
         let enum_ident = &nodyn.ident;
         let enum_generics = nodyn.generics_tokens();
+        let type_generics = self.merged_type_generics_tokens(nodyn);
 
         quote! {
             /// Sorts the slice, preserving initial order of equal elements.
             /// See [`Vec::sort()`].
-            impl #generics #ident #generics #where_clause {
+            impl #generics #ident #type_generics #where_clause {
                 #visibility fn sort(&mut self) {
                     self.#field.sort();
                 }
@@ -1079,7 +1087,7 @@ impl VecWrapper {
 
             /// Sorts the slice without preserving the initial order of equal elements.
             /// See [`Vec::sort_unstable()`].
-            impl #generics #ident #generics #where_clause {
+            impl #generics #ident #type_generics #where_clause {
                 #visibility fn sort_unstable(&mut self) {
                     self.#field.sort_unstable();
                 }
@@ -1087,7 +1095,7 @@ impl VecWrapper {
 
             /// Binary searches this slice for a given element.
             /// See [`Vec::binary_search()`].
-            impl #generics #ident #generics #where_clause {
+            impl #generics #ident #type_generics #where_clause {
                 #visibility fn binary_search(&mut self, x: &#enum_ident #enum_generics) -> ::core::result::Result<usize, usize> {
                     self.#field.binary_search(x)
                 }
@@ -1110,9 +1118,10 @@ impl VecWrapper {
         let enum_ident = &nodyn.ident;
         let enum_generics = nodyn.generics_tokens();
         let new_type = &nodyn.generics.new_type();
+        let type_generics = self.merged_type_generics_tokens(nodyn);
 
         quote! {
-            impl #generics #ident #generics #where_clause {
+            impl #generics #ident #type_generics #where_clause {
                 /// Copies all elements from src into self, using a memcpy.
                 /// See [`Vec::copy_from_slice`].
                 #visibility fn copy_from_slice(&mut self, src: &[#enum_ident #enum_generics]) {
@@ -1156,9 +1165,21 @@ impl VecWrapper {
 
     fn generics_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
         if self.is_custom {
-            nodyn.merged_generics_tokens(&self.definition.generics)
+            self.definition
+                .generics
+                .merged_generics_tokens(&nodyn.generics)
         } else {
             nodyn.generics_tokens()
+        }
+    }
+
+    fn merged_type_generics_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
+        if self.is_custom {
+            self.definition
+                .generics
+                .merged_type_generics_tokens(&nodyn.generics)
+        } else {
+            nodyn.generics.type_generics_tokens()
         }
     }
 
@@ -1173,17 +1194,20 @@ impl VecWrapper {
     fn merge_generics(
         &self,
         nodyn: &NodynEnum,
-        extra1: &GenericParam,
+        extra1: &Generics,
         extra2: &WherePredicate,
     ) -> (TokenStream, TokenStream) {
         if self.is_custom {
             (
-                nodyn.merged_generics_and_param_tokens(&self.definition.generics, extra1),
+                // nodyn.merged_generics_and_param_tokens(&self.definition.generics, extra1),
+                self.definition
+                    .generics
+                    .merged2_generics_tokens(&nodyn.generics, extra1),
                 nodyn.merged_where_and_predicate_tokens(&self.definition.generics, extra2),
             )
         } else {
             (
-                nodyn.generics_and_param_tokens(extra1),
+                nodyn.generics.merged_generics_tokens(extra1),
                 nodyn.where_and_predicate_tokens(extra2),
             )
         }
