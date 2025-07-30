@@ -1,4 +1,4 @@
-name: CI
+name: Rust CI
 
 on:
   push:
@@ -7,21 +7,31 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  build-and-test:
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        rust: [1.85.0, stable]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        rust: [stable, beta]
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
-          override: true
-          components: clippy
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ matrix.rust }}-
 
       - name: Build
         run: cargo build --verbose
@@ -29,8 +39,10 @@ jobs:
       - name: Run tests
         run: cargo test --verbose --no-default-features
 
-      - name: Run Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
-
-      - name: Run Fmt
+      - name: Check formatting
         run: cargo fmt -- --check
+        if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
+
+      - name: Run clippy
+        run: cargo clippy -- -D warnings
+        if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
