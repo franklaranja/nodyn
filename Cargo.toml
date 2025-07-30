@@ -18,7 +18,7 @@ categories = [
 readme = "README.md"
 license = "MIT"
 edition = "2024"
-rust-version = "1.56.0"
+rust-version = "1.85.0"
 autotests = false
 exclude = [".*"]
 
