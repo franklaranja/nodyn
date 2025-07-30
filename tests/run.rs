@@ -12,10 +12,12 @@ fn tests() {
     t.pass("tests/09_type_functions.rs");
     t.pass("tests/10_advanced_example.rs");
     t.pass("tests/11_vec_wrapper.rs");
+    t.pass("tests/12_with_copy.rs");
 
     t.pass("tests/enum/basic.rs");
     t.pass("tests/enum/custom_variants.rs");
     t.pass("tests/enum/from.rs");
+    t.pass("tests/enum/generics.rs");
 
     t.pass("tests/features/is_as.rs");
     t.pass("tests/features/introspection.rs");
