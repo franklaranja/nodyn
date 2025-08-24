@@ -3,11 +3,11 @@ use std::collections::HashSet;
 
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
+use syn::parse::Parse;
+use syn::parse::ParseStream;
 use syn::{
     Attribute, FnArg, Generics, Ident, Meta, Path, Token, Type, Visibility, WherePredicate,
-    parse::{Parse, ParseStream},
-    punctuated::Punctuated,
-    spanned::Spanned,
+    punctuated::Punctuated, spanned::Spanned,
 };
 
 use crate::{MethodImpl, OptionalImpl, TraitImpl, Variant, VecWrapper, keyword};

@@ -519,12 +519,14 @@
 //!
 //! And the following traits for each variant with type `V`:
 //!
-//! | Trait             | Required Trait  | Description |
+//! | Trait             | Required Trait(*)  | Description |
 //! |-------------------|-----------------|-------------|
-//! | `Extend<V>`       | `Clone`         | Extend wrapper with items of this variant |
+//! | `Extend<V>`       |                 | Extend wrapper with items of this variant |
 //! | `From<&[V]>`      | `Default` & `Clone` | Create wrapper from slice of this variant |
 //! | `From<&mut [V]>`  | `Default` & `Clone` | Create wrapper from mutable slice |
 //! | `From<Vec<V>>`    | `Default`       | Create wrapper from `Vec` of this variant |
+//!
+//! (*) Default is required for the `Vec` wrapper, other traits are required for the enum.
 //!
 //! ### Game Inventory Example
 //!
@@ -561,7 +563,7 @@
 //! The `vec` wrapper implements many [`Vec`] methods and traits, with some modified to
 //! leverage `nodyn` features. The following table summarizes them:
 //!
-//! | Method | Required Traits | Differences from [`Vec`] |
+//! | Method | Required Traits(*) | Differences from [`Vec`] |
 //! |--------|-----------------|----------------------------------------|
 //! | [`append`][Vec::append] | none | none; direct delegation |
 //! | [`as_mut_slice`][Vec::as_mut_slice] | none | none; direct delegation |
@@ -632,7 +634,9 @@
 //! | [`try_reserve`][Vec::try_reserve] | none | none; direct delegation |
 //! | [`with_capacity`][Vec::with_capacity] | `Default` | initializes other fields with `Default::default()` |
 //!
-//! | trait | required traits | differences from [`std::vec::Vec`] |
+//! (*) Default is required for the `Vec` wrapper, other traits are required for the enum.
+//!
+//! | trait | required traits(*) | differences from [`std::vec::Vec`] |
 //! |-------|-----------------|------------------------------------|
 //! | [`AsMut<Self>`][std::convert::AsMut]            | none | returns `&mut self`. |
 //! | [`AsMut<Vec<enum>>`][std::convert::AsMut]       | none | delegates to `vec`. |
@@ -649,6 +653,8 @@
 //! | [`IndexMut`][std::ops::IndexMut]                | none | delegates to `vec::index_mut`. |
 //! | [`Index`][std::ops::Index]                      | none | delegates to `vec::index`. |
 //! | [`IntoIterator`]       | none | implemented for `&self`, `&mut self`, and `self`. |
+//!
+//! (*) Default is required for the `Vec` wrapper, other traits are required for the enum.
 //!
 //! ## Feature Flags
 //!
@@ -971,3 +977,29 @@ impl GenericsExt for Generics {
         }
     }
 }
+
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use syn::parse_str;
+//
+//     #[test]
+//     fn test_trait_derived() {
+//         let input = parse_str::<NodynEnum>(
+//             "
+//             #[derive(Debug)]
+//             #[derive(Default, Clone)]
+//             pub enum MyEnum {
+//                 Number(i32),
+//                 String,
+//             }
+//             ",
+//         )
+//         .unwrap();
+//         assert!(trait_derived(&input.attrs, "Default"));
+//         assert!(trait_derived(&input.attrs, "Clone"));
+//         assert!(trait_derived(&input.attrs, "Debug"));
+//         assert!(!trait_derived(&input.attrs, "Copy"));
+//         assert!(!trait_derived(&input.attrs, "Foo"));
+//     }
+// }

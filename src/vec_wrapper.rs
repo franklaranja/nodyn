@@ -25,8 +25,6 @@ pub(crate) struct VecWrapper {
     pub(crate) vec_field: Ident,
     /// Whether the struct is custom (defined with `#[vec_wrapper]`).
     pub(crate) is_custom: bool,
-    /// Derived traits (e.g., `Default`, `Clone`, `PartialEq`).
-    pub(crate) derived_traits: Vec<String>,
 }
 
 impl Parse for VecWrapper {
@@ -62,7 +60,6 @@ impl Parse for VecWrapper {
                 attrs.push(attribute);
             }
         }
-        let traits = Self::extract_traits(&attrs);
         wrapper.attrs = attrs;
 
         if let Some(vec_field) = vec_field {
@@ -70,7 +67,6 @@ impl Parse for VecWrapper {
                 definition: wrapper,
                 vec_field,
                 is_custom: true,
-                derived_traits: traits,
             })
         } else {
             Err(syn::Error::new(
@@ -97,13 +93,10 @@ impl VecWrapper {
                 inner: std::vec::Vec< #enum_ident #generics >,
             }
         };
-        let mut traits = Self::extract_traits(derive_attr);
-        traits.push("Default".to_string());
         Self {
             definition: wrapper,
             vec_field: Ident::new("inner", Span::call_site()),
             is_custom: false,
-            derived_traits: traits,
         }
     }
 
@@ -168,7 +161,7 @@ impl VecWrapper {
         let where_clause = self.where_tokens(nodyn);
         let delegated_methods = &self.delegated_methods_tokens(nodyn);
         let modified_methods = &self.modified_methods_tokens(nodyn);
-        let partial_eq_methods = &self.partial_eq_methods_tokens();
+        let partial_eq_methods = &self.partial_eq_methods_tokens(nodyn);
         let field = &self.vec_field;
         let variant_methods = nodyn.variant_vec_tokens(field);
         let type_generics = self.merged_type_generics_tokens(nodyn);
@@ -620,8 +613,8 @@ impl VecWrapper {
     /// Generates methods that require the `PartialEq` trait.
     ///
     /// - [`dedup`][Vec::dedup]: Removes consecutive duplicate elements.
-    fn partial_eq_methods_tokens(&self) -> TokenStream {
-        if !self.derived_traits.contains(&"PartialEq".to_string()) {
+    fn partial_eq_methods_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
+        if !is_trait_derived(&nodyn.attrs, "PartialEq") {
             return TokenStream::new();
         }
         let field = &self.vec_field;
@@ -649,6 +642,8 @@ impl VecWrapper {
     /// - [`AsMut<Vec<Enum>>`][AsMut]
     /// - [`AsRef<[Enum]>`][AsRef]
     /// - [`AsMut<[Enum]>`][AsMut]
+    /// - [`Extend<Enum>`][Extend] also for each variant
+    #[allow(clippy::too_many_lines)]
     fn traits_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
         let ident = &self.definition.ident;
         let enum_ident = &nodyn.ident;
@@ -672,7 +667,26 @@ impl VecWrapper {
         };
         let type_generics = self.merged_type_generics_tokens(nodyn);
 
+        let variants = nodyn.variants.iter().map(|variant| {
+            let ty = &variant.ty;
+            quote!{
+                impl #generics ::core::iter::Extend<#ty> for #ident #type_generics #where_clause {
+                    fn extend<#new_type: ::core::iter::IntoIterator<Item = #ty>>(&mut self, iter: #new_type) {
+                        self.#field.extend(iter.into_iter().map(#enum_ident::from))
+                    }
+                }
+            }
+        }).collect::<Vec<_>>();
+
         quote! {
+            impl #generics ::core::iter::Extend<#enum_ident #enum_generics> for #ident #type_generics #where_clause {
+                fn extend<#new_type: ::core::iter::IntoIterator<Item = #enum_ident #enum_generics>>(&mut self, iter: #new_type) {
+                    self.#field.extend(iter.into_iter())
+                }
+            }
+
+            #(#variants)*
+
             impl #generics ::core::convert::From<#ident #type_generics> for ::std::vec::Vec<#enum_ident #enum_generics> #where_clause {
                 fn from(v: #ident #type_generics) -> ::std::vec::Vec<#enum_ident #enum_generics> {
                     v.#field
@@ -763,7 +777,7 @@ impl VecWrapper {
     /// - [`with_capacity`][Vec::with_capacity]
     /// - [`split_off`][Vec::split_off]
     fn with_default_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
-        if !self.derived_traits.contains(&"Default".to_string()) {
+        if !is_trait_derived(&self.definition.attrs, "Default") {
             return TokenStream::new();
         }
         let field = &self.vec_field;
@@ -845,7 +859,6 @@ impl VecWrapper {
 
     /// Generates traits and methods that require `Clone`.
     ///
-    /// - [`Extend<Enum>`][Extend] also for each variant
     /// - [`resize`][Vec::resize]
     /// - [`extend_from_within`][Vec::extend_from_within]
     /// - [`extend_from_slice`][Vec::extend_from_slice]
@@ -853,7 +866,7 @@ impl VecWrapper {
     /// - [`to_vec`][Vec::to_vec]
     /// - [`fill`][Vec::fill]
     fn with_clone_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
-        if !self.derived_traits.contains(&"Clone".to_string()) {
+        if !is_trait_derived(&nodyn.attrs, "Clone") {
             return TokenStream::new();
         }
         let field = &self.vec_field;
@@ -866,26 +879,7 @@ impl VecWrapper {
         let new_type = &nodyn.generics.new_type();
         let type_generics = self.merged_type_generics_tokens(nodyn);
 
-        let variants = nodyn.variants.iter().map(|variant| {
-            let ty = &variant.ty;
-            quote!{
-                impl #generics ::core::iter::Extend<#ty> for #ident #type_generics #where_clause {
-                    fn extend<#new_type: ::core::iter::IntoIterator<Item = #ty>>(&mut self, iter: #new_type) {
-                        self.#field.extend(iter.into_iter().map(#enum_ident::from))
-                    }
-                }
-            }
-        }).collect::<Vec<_>>();
-
         quote! {
-            impl #generics ::core::iter::Extend<#enum_ident #enum_generics> for #ident #type_generics #where_clause {
-                fn extend<#new_type: ::core::iter::IntoIterator<Item = #enum_ident #enum_generics>>(&mut self, iter: #new_type) {
-                    self.#field.extend(iter.into_iter())
-                }
-            }
-
-            #(#variants)*
-
             impl #generics #ident #type_generics #where_clause {
                 /// Resizes the vector to the new length, using the provided value.
                 /// Accepts `Into<Enum>` for the value.
@@ -974,8 +968,8 @@ impl VecWrapper {
     /// - `From<&[Enum]>` also for each variant
     /// - `From<&mut [Enum]>` also for each variant
     fn with_clone_and_default_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
-        if !self.derived_traits.contains(&"Clone".to_string())
-            || !self.derived_traits.contains(&"Default".to_string())
+        if !is_trait_derived(&nodyn.attrs, "Clone")
+            || !is_trait_derived(&self.definition.attrs, "Default")
         {
             return TokenStream::new();
         }
@@ -1037,7 +1031,7 @@ impl VecWrapper {
     /// Generates methods that require the enum to have `#[derive(PartialOrd)]`;
     /// - [`is_sorted`][Vec::is_sorted]
     fn with_partial_ord_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
-        if !self.derived_traits.contains(&"PartialOrd".to_string()) {
+        if !is_trait_derived(&nodyn.attrs, "PartialOrd") {
             return TokenStream::new();
         }
         let field = &self.vec_field;
@@ -1064,7 +1058,7 @@ impl VecWrapper {
     /// - [`sort_unstable`][Vec::sort_unstable]
     /// - [`binary_search`][Vec::binary_search]
     fn with_ord_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
-        if !self.derived_traits.contains(&"Ord".to_string()) {
+        if !is_trait_derived(&nodyn.attrs, "Ord") {
             return TokenStream::new();
         }
         let field = &self.vec_field;
@@ -1107,7 +1101,7 @@ impl VecWrapper {
     /// - [`copy_from_slice`][Vec::copy_from_slice]
     /// - [`copy_within`][Vec::copy_within]
     fn with_copy_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
-        if !self.derived_traits.contains(&"Copy".to_string()) {
+        if !is_trait_derived(&nodyn.attrs, "Copy") {
             return TokenStream::new();
         }
         let field = &self.vec_field;
@@ -1136,31 +1130,6 @@ impl VecWrapper {
                 }
             }
         }
-    }
-
-    /// Extracts derived traits from the struct's attributes.
-    fn extract_traits(attrs: &[Attribute]) -> Vec<String> {
-        let parser = Punctuated::<Ident, Token![,]>::parse_terminated;
-        attrs
-            .iter()
-            .filter_map(|attr| {
-                if let Meta::List(list) = &attr.meta {
-                    if list.path.is_ident("derive") {
-                        parser.parse(list.tokens.clone().into()).ok().map(|idents| {
-                            idents
-                                .into_iter()
-                                .map(|id| id.to_string())
-                                .collect::<Vec<_>>()
-                        })
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            })
-            .flatten()
-            .collect()
     }
 
     fn generics_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
@@ -1249,4 +1218,22 @@ fn strip_copy(attrs: &[Attribute]) -> Vec<Attribute> {
             }
         })
         .collect()
+}
+
+fn is_trait_derived(attributes: &[Attribute], trait_name: &str) -> bool {
+    let parser = Punctuated::<Ident, Token![,]>::parse_terminated;
+    for attr in attributes {
+        if let Meta::List(list) = &attr.meta {
+            if list.path.is_ident("derive") {
+                if let Ok(idents) = parser.parse(list.tokens.clone().into()) {
+                    for id in idents {
+                        if id == trait_name {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
 }

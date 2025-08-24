@@ -10,6 +10,15 @@ See the [nodyn GitHub repository](https://github.com/franklaranja/nodyn) for mor
 
 No changes yet.
 
+## 0.2.1
+
+### Bug fixes
+
+- When generating code for the polymorphic `Vec`s the macro
+  checked necessary traits against the Vec wrapper and not the enum
+  this has been fixed. only `Default` is checked for the vec wrapper.
+- Implementations of `Extend` for the vec wrapper are now always generated.
+
 ## [0.2.0] - 2025-08-01
 
 ### Added
