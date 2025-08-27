@@ -10,6 +10,19 @@ See the [nodyn GitHub repository](https://github.com/franklaranja/nodyn) for mor
 
 No changes yet.
 
+## 0.2.2
+
+### Bug fixes
+
+- Visibility if the wrapped `Vec` is now the same as that of the
+  wrapper which is necessary for the macro that generates vec
+  wrappers, to work.
+- `Deref` and `DerefMut` are now implemented for the standard vec
+  wrapper so when using a reference to the wrapper this gets
+  dereferenced to a slice (just like a normal `Vec`).
+- Doc comments can now be added to vec items (to generated standard
+  vec wrappers).
+
 ## 0.2.1
 
 ### Bug fixes
@@ -43,7 +56,7 @@ No changes yet.
   inventory.push(50u32); // Directly push u32
   assert_eq!(inventory.count_str_ref(), 2); // Count &str variants
   for (i, s) in inventory.iter_str_ref().enumerate() {
-      println!("String #{}: {}", i, s); // Iterate over &str variants
+      println!("String #{}: {}", i,ke s); // Iterate over &str variants
   }
   ```
 

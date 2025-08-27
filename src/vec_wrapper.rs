@@ -1,15 +1,66 @@
 use core::option::Option::None;
-use proc_macro2::{Ident, Span, TokenStream, TokenTree};
-use quote::{ToTokens, quote};
+use proc_macro2::{Span, TokenStream, TokenTree};
+use quote::{ToTokens, format_ident, quote};
 use syn::spanned::Spanned;
 use syn::{
-    Attribute, Fields, Generics, ItemStruct, Meta, Token, Visibility, WherePredicate,
+    Attribute, Fields, Generics, Ident, ItemStruct, Meta, Token, Visibility, WherePredicate,
     parse::{Parse, ParseStream, Parser},
     parse_quote,
     punctuated::Punctuated,
 };
 
 use crate::{GenericsExt, NodynEnum, camel_to_snake};
+
+#[derive(Debug, Clone)]
+pub(crate) struct StandardVecWrapper {
+    attrs: Vec<Attribute>,
+    ident: Option<Ident>,
+}
+
+impl Parse for StandardVecWrapper {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let attrs = input.call(Attribute::parse_outer)?;
+        input.parse::<crate::keyword::vec>()?;
+        let ident = if input.peek(Ident) {
+            Some(input.parse::<Ident>()?)
+        } else {
+            None
+        };
+        if input.peek(Token![;]) {
+            input.parse::<syn::token::Semi>()?;
+        }
+        Ok(Self { attrs, ident })
+    }
+}
+
+impl StandardVecWrapper {
+    pub(crate) fn into_vec_wrapper(
+        self,
+        visibility: &Visibility,
+        enum_ident: &Ident,
+        generics: &Generics,
+        derive_attr: &[Attribute],
+    ) -> VecWrapper {
+        let ident = self
+            .ident
+            .unwrap_or_else(|| format_ident!("{}Vec", enum_ident));
+        let defined_attrs = self.attrs;
+        let stripped_attrs = strip_copy(derive_attr);
+        let wrapper: ItemStruct = parse_quote! {
+            #[derive(Default)]
+            #(#defined_attrs)*
+            #(#stripped_attrs)*
+            #visibility struct #ident #generics {
+                #visibility inner: std::vec::Vec< #enum_ident #generics >,
+            }
+        };
+        VecWrapper {
+            definition: wrapper,
+            vec_field: Ident::new("inner", Span::call_site()),
+            is_custom: false,
+        }
+    }
+}
 
 /// Represents a wrapper struct for a collection of enum variants in the `nodyn` crate.
 ///
@@ -78,28 +129,6 @@ impl Parse for VecWrapper {
 }
 
 impl VecWrapper {
-    pub(crate) fn standard_vec_wrapper(
-        ident: &Ident,
-        visibility: &Visibility,
-        enum_ident: &Ident,
-        generics: &Generics,
-        derive_attr: &[Attribute],
-    ) -> Self {
-        let stripped_attrs = strip_copy(derive_attr);
-        let wrapper: ItemStruct = parse_quote! {
-            #[derive(Default)]
-            #(#stripped_attrs)*
-            #visibility struct #ident #generics {
-                inner: std::vec::Vec< #enum_ident #generics >,
-            }
-        };
-        Self {
-            definition: wrapper,
-            vec_field: Ident::new("inner", Span::call_site()),
-            is_custom: false,
-        }
-    }
-
     /// Generates the complete `TokenStream` for the wrapper struct and its implementations.
     pub(crate) fn to_token_stream(&self, nodyn: &NodynEnum) -> TokenStream {
         let wrapper_struct = self.struct_tokens(nodyn);
@@ -146,7 +175,7 @@ impl VecWrapper {
                 #visibility struct #ident #generics
                 #where_clause {
                     #(#fields ,)*
-                    #field: std::vec::Vec< #enum_ident #enum_generics >,
+                    #visibility #field: std::vec::Vec< #enum_ident #enum_generics >,
                 }
             }
         } else {
@@ -678,7 +707,28 @@ impl VecWrapper {
             }
         }).collect::<Vec<_>>();
 
+        let deref = if self.is_custom {
+            TokenStream::new()
+        } else {
+            quote! {
+                impl #generics ::core::ops::Deref for #ident #type_generics #where_clause {
+                    type Target = [#enum_ident #enum_generics];
+                    fn deref(&self) -> &[#enum_ident #enum_generics] {
+                        self.as_slice()
+                    }
+                }
+
+                impl #generics ::core::ops::DerefMut for #ident #type_generics #where_clause {
+                    fn deref_mut(&mut self) -> &mut [#enum_ident #enum_generics] {
+                        self.as_mut_slice()
+                    }
+                }
+            }
+        };
+
         quote! {
+            #deref
+
             impl #generics ::core::iter::Extend<#enum_ident #enum_generics> for #ident #type_generics #where_clause {
                 fn extend<#new_type: ::core::iter::IntoIterator<Item = #enum_ident #enum_generics>>(&mut self, iter: #new_type) {
                     self.#field.extend(iter.into_iter())

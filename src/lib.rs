@@ -369,6 +369,8 @@
 //!         i32,
 //!         String,
 //!     }
+//!
+//!     /// A polymorphic vec wrapper around `Vec<Value>`.
 //!     vec Values;
 //! }
 //!
@@ -468,7 +470,8 @@
 //! `#[vec]` or `#[vec(field_name)]` attribute. Without
 //! a field name, 'inner' is used. `nodyn!` adds the field. Unlike the
 //! standard polymorphic vec, derive arguments are not copied from the enum.
-//! `nodyn!` does not implement `Deref` or `DerefMut`, so you can!
+//! `nodyn!` does not implement `Deref` or `DerefMut` for custom wrappers,
+//! so you can! (but you have to call `as_slice` yourself).
 //!
 //! I recommend you put `#[derive(Default)]` on your custom polymorphic vec
 //! so nodyn can generate the macro and implement the `From` trait.
@@ -644,6 +647,8 @@
 //! | [`AsRef<Self>`][std::convert::AsRef]            | none | returns `&self`. |
 //! | [`AsRef<Vec<enum>>`][std::convert::AsRef]       | none | delegates to `vec`. |
 //! | [`AsRef<[enum]>`][std::convert::AsRef]          | none | delegates to `vec`. |
+//! | [`Deref`][std::ops::Deref](**)                  | none | |
+//! | [`DerefMut`][std::ops::DerefMut](**)                  | none | |
 //! | [`Extend<enum>`][std::iter::Extend]             | `Clone` | delegates to `vec::extend`. |
 //! | [`From<&[enum]>`][std::convert::From]           | `Clone`, `Default` | initializes other fields with `default::default()`. |
 //! | [`From<&mut [enum]>`][std::convert::From]       | `Clone`, `Default` | initializes other fields with `default::default()`. |
@@ -654,7 +659,10 @@
 //! | [`Index`][std::ops::Index]                      | none | delegates to `vec::index`. |
 //! | [`IntoIterator`]       | none | implemented for `&self`, `&mut self`, and `self`. |
 //!
+//!
 //! (*) Default is required for the `Vec` wrapper, other traits are required for the enum.
+//!
+//! (**) Only implemented for standard vec wrappers.
 //!
 //! ## Feature Flags
 //!

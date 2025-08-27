@@ -10,6 +10,7 @@ use syn::{
     punctuated::Punctuated, spanned::Spanned,
 };
 
+use crate::vec_wrapper::StandardVecWrapper;
 use crate::{MethodImpl, OptionalImpl, TraitImpl, Variant, VecWrapper, keyword};
 
 /// Represents the input for the `nodyn` procedural macro, defining a nodyn enum.
@@ -83,25 +84,15 @@ impl Parse for NodynEnum {
                 } else {
                     impl_blocks.push(input.parse::<MethodImpl>()?);
                 }
-            } else if input.peek(crate::keyword::vec) {
-                input.parse::<crate::keyword::vec>()?;
-                let vec_ident = if input.peek(Ident) {
-                    input.parse::<Ident>()?
-                } else {
-                    format_ident!("{}Vec", ident)
-                };
-                collection_structs.push(VecWrapper::standard_vec_wrapper(
-                    &vec_ident,
+            } else if let Ok(wrapper_struct) = input.parse::<VecWrapper>() {
+                collection_structs.push(wrapper_struct);
+            } else if let Ok(standard_wrapper) = input.parse::<StandardVecWrapper>() {
+                collection_structs.push(standard_wrapper.into_vec_wrapper(
                     &visibility,
                     &ident,
                     &generics,
                     &derive_attrs,
                 ));
-                if input.peek(Token![;]) {
-                    input.parse::<syn::token::Semi>()?;
-                }
-            } else if let Ok(wrapper_struct) = input.parse::<VecWrapper>() {
-                collection_structs.push(wrapper_struct);
             } else {
                 return Err(syn::Error::new(
                     input.span(),
