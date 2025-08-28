@@ -564,7 +564,9 @@
 //! ## Delegated `Vec` Methods and Traits
 //!
 //! The `vec` wrapper implements many [`Vec`] methods and traits, with some modified to
-//! leverage `nodyn` features. The following table summarizes them:
+//! leverage `nodyn` features. Methods that directly delegate to slice methods are
+//! only implemented for custom wrappers as standard wrappers handle this using `Deref` and
+//! `DerefMut`.
 //!
 //! | Method | Required Traits(*) | Differences from [`Vec`] |
 //! |--------|-----------------|----------------------------------------|

@@ -6,6 +6,8 @@ nodyn! {
         i32,
         String,
     }
+
+    /// Standard vec wrapper `ValueVec`
     vec;
 }
 

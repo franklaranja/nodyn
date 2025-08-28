@@ -84,20 +84,35 @@ impl Parse for NodynEnum {
                 } else {
                     impl_blocks.push(input.parse::<MethodImpl>()?);
                 }
-            } else if let Ok(wrapper_struct) = input.parse::<VecWrapper>() {
-                collection_structs.push(wrapper_struct);
-            } else if let Ok(standard_wrapper) = input.parse::<StandardVecWrapper>() {
-                collection_structs.push(standard_wrapper.into_vec_wrapper(
-                    &visibility,
-                    &ident,
-                    &generics,
-                    &derive_attrs,
-                ));
             } else {
-                return Err(syn::Error::new(
-                    input.span(),
-                    "Expected 'impl' or struct item",
-                ));
+                let attrs = input.call(Attribute::parse_outer)?;
+                if input.peek(keyword::vec) {
+                    let mut standard_wrapper = input.parse::<StandardVecWrapper>()?;
+                    standard_wrapper.attrs = attrs;
+                    collection_structs.push(standard_wrapper.into_vec_wrapper(
+                        &visibility,
+                        &ident,
+                        &generics,
+                        &derive_attrs,
+                    ));
+                } else if let Ok(mut wrapper_struct) = input.parse::<VecWrapper>() {
+                    let (attrs, vec_field) = VecWrapper::parse_custom_attrs(attrs);
+                    if let Some(vec_field) = vec_field {
+                        wrapper_struct.definition.attrs = attrs;
+                        wrapper_struct.vec_field = vec_field;
+                        collection_structs.push(wrapper_struct);
+                    } else {
+                        return Err(syn::Error::new(
+                            wrapper_struct.definition.span(),
+                            "Struct is missing #[vec] atrribute",
+                        ));
+                    }
+                } else {
+                    return Err(syn::Error::new(
+                        input.span(),
+                        "Expected 'impl' or struct item",
+                    ));
+                }
             }
         }
 

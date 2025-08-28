@@ -13,13 +13,15 @@ use crate::{GenericsExt, NodynEnum, camel_to_snake};
 
 #[derive(Debug, Clone)]
 pub(crate) struct StandardVecWrapper {
-    attrs: Vec<Attribute>,
+    pub(crate) attrs: Vec<Attribute>,
     ident: Option<Ident>,
 }
 
 impl Parse for StandardVecWrapper {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let attrs = input.call(Attribute::parse_outer)?;
+        // let attrs = input.call(Attribute::parse_outer)?;
+        // println!("vec attrs: {attrs:?}");
+        let attrs = Vec::new();
         input.parse::<crate::keyword::vec>()?;
         let ident = if input.peek(Ident) {
             Some(input.parse::<Ident>()?)
@@ -80,22 +82,33 @@ pub(crate) struct VecWrapper {
 
 impl Parse for VecWrapper {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut wrapper = input.parse::<ItemStruct>()?;
+        let wrapper = input.parse::<ItemStruct>()?;
         if !matches!(wrapper.fields, Fields::Named(_)) {
             return Err(syn::Error::new(
                 wrapper.span(),
                 "Only structs with named fields are supported",
             ));
         }
-        let mut attrs = Vec::new();
+        let vec_field = format_ident!("temp");
+        Ok(Self {
+            definition: wrapper,
+            vec_field,
+            is_custom: true,
+        })
+    }
+}
+
+impl VecWrapper {
+    pub(crate) fn parse_custom_attrs(attrs: Vec<Attribute>) -> (Vec<Attribute>, Option<Ident>) {
+        let mut result_attrs = Vec::new();
         let vec_wrapper = Ident::new("vec", Span::call_site());
         let mut vec_field = None;
-        for attribute in wrapper.attrs {
+        for attribute in attrs {
             if let Meta::Path(path) = &attribute.meta {
                 if path.is_ident(&vec_wrapper) {
                     vec_field = Some(Ident::new("inner_vec", Span::call_site()));
                 } else {
-                    attrs.push(attribute);
+                    result_attrs.push(attribute);
                 }
             } else if let Meta::List(list) = &attribute.meta {
                 if list.path.is_ident(&vec_wrapper) {
@@ -105,30 +118,15 @@ impl Parse for VecWrapper {
                         vec_field = Some(Ident::new("inner_vec", Span::call_site()));
                     }
                 } else {
-                    attrs.push(attribute);
+                    result_attrs.push(attribute);
                 }
             } else {
-                attrs.push(attribute);
+                result_attrs.push(attribute);
             }
         }
-        wrapper.attrs = attrs;
-
-        if let Some(vec_field) = vec_field {
-            Ok(Self {
-                definition: wrapper,
-                vec_field,
-                is_custom: true,
-            })
-        } else {
-            Err(syn::Error::new(
-                wrapper.span(),
-                "Struct is missing #[vec] atrribute",
-            ))
-        }
+        (result_attrs, vec_field)
     }
-}
 
-impl VecWrapper {
     /// Generates the complete `TokenStream` for the wrapper struct and its implementations.
     pub(crate) fn to_token_stream(&self, nodyn: &NodynEnum) -> TokenStream {
         let wrapper_struct = self.struct_tokens(nodyn);
@@ -189,6 +187,11 @@ impl VecWrapper {
         let generics = self.generics_tokens(nodyn);
         let where_clause = self.where_tokens(nodyn);
         let delegated_methods = &self.delegated_methods_tokens(nodyn);
+        let slice_methods = if self.is_custom {
+            self.slice_methods_tokens(nodyn)
+        } else {
+            TokenStream::new()
+        };
         let modified_methods = &self.modified_methods_tokens(nodyn);
         let partial_eq_methods = &self.partial_eq_methods_tokens(nodyn);
         let field = &self.vec_field;
@@ -198,6 +201,7 @@ impl VecWrapper {
         quote! {
             impl #generics #ident #type_generics #where_clause {
                 #delegated_methods
+                #slice_methods
                 #modified_methods
                 #partial_eq_methods
                 #variant_methods
@@ -230,35 +234,9 @@ impl VecWrapper {
     /// - [`append`][Vec::append]
     /// - [`splice`][Vec::splice]
     /// - [`extract_if`][Vec::extract_if]
-    /// - [`first`][Vec::first]
-    /// - [`first_mut`][Vec::first_mut]
-    /// - [`last`][Vec::last]
-    /// - [`last_mut`][Vec::last_mut]
-    /// - [`split_first`][Vec::split_first]
-    /// - [`split_first_mut`][Vec::split_first_mut]
-    /// - [`split_last`][Vec::split_last]
-    /// - [`split_last_mut`][Vec::split_last_mut]
-    /// - [`get`][Vec::get]
-    /// - [`get_mut`][Vec::get_mut]
-    /// - [`swap`][Vec::swap]
-    /// - [`reverse`][Vec::reverse]
-    /// - [`iter`][Vec::iter]
-    /// - [`iter_mut`][Vec::iter_mut]
     /// - [`clear`][Vec::clear]
     /// - [`len`][Vec::len]
     /// - [`is_empty`][Vec::is_empty]
-    /// - [`fill_with`][Vec::fill_with]
-    /// - [`rotate_left`][Vec::rotate_left]
-    /// - [`rotate_right`][Vec::rotate_right]
-    /// - [`is_sorted_by`][Vec::is_sorted_by]
-    /// - [`is_sorted_by_key`][Vec::is_sorted_by_key]
-    /// - [`sort_by`][Vec::sort_by]
-    /// - [`sort_by_key`][Vec::sort_by_key]
-    /// - [`sort_unstable_by`][Vec::sort_unstable_by]
-    /// - [`sort_unstable_by_key`][Vec::sort_unstable_by_key]
-    /// - [`binary_search_by`][Vec::binary_search_by]
-    /// - [`binary_search_by_key`][Vec::binary_search_by_key]
-    #[allow(clippy::too_many_lines)]
     fn delegated_methods_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
         let field = &self.vec_field;
         let visibility = &self.definition.vis;
@@ -267,7 +245,6 @@ impl VecWrapper {
         let nt = &nodyn.generics.new_types(2);
         let new_type = &nt[0];
         let new_type2 = &nt[1];
-        let lt = &nodyn.generics.new_lifetime();
 
         quote! {
             /// Returns the total number of elements the vector can hold without reallocating.
@@ -417,94 +394,6 @@ impl VecWrapper {
                 self.#field.extract_if(range, filter)
             }
 
-            /// Returns the first element, if any.
-            /// See [`Vec::first`].
-            #visibility fn first(&self) -> ::core::option::Option<&#enum_ident #enum_generics> {
-                self.#field.first()
-            }
-
-            /// Returns a mutable reference to the first element, if any.
-            /// See [`Vec::first_mut`].
-            #visibility fn first_mut(&mut self) -> ::core::option::Option<&mut #enum_ident #enum_generics> {
-                self.#field.first_mut()
-            }
-
-            /// Returns the last element, if any.
-            /// See [`Vec::last`].
-            #visibility fn last(&self) -> ::core::option::Option<&#enum_ident #enum_generics> {
-                self.#field.last()
-            }
-
-            /// Returns a mutable reference to the last element, if any.
-            /// See [`Vec::last_mut`].
-            #visibility fn last_mut(&mut self) -> ::core::option::Option<&mut #enum_ident #enum_generics> {
-                self.#field.last_mut()
-            }
-
-            /// Returns the first element and the rest of the slice, if any.
-            /// See [`Vec::split_first`].
-            #visibility fn split_first(&self) -> ::core::option::Option<(&#enum_ident #enum_generics, &[#enum_ident #enum_generics])> {
-                self.#field.split_first()
-            }
-
-            /// Returns a mutable first element and the rest of the slice, if any.
-            /// See [`Vec::split_first_mut`].
-            #visibility fn split_first_mut(&mut self) -> ::core::option::Option<(&mut #enum_ident #enum_generics, &mut [#enum_ident #enum_generics])> {
-                self.#field.split_first_mut()
-            }
-
-            /// Returns the last element and the rest of the slice, if any.
-            /// See [`Vec::split_last`].
-            #visibility fn split_last(&self) -> ::core::option::Option<(&#enum_ident #enum_generics, &[#enum_ident #enum_generics])> {
-                self.#field.split_last()
-            }
-
-            /// Returns a mutable last element and the rest of the slice, if any.
-            /// See [`Vec::split_last_mut`].
-            #visibility fn split_last_mut(&mut self) -> ::core::option::Option<(&mut #enum_ident #enum_generics, &mut [#enum_ident #enum_generics])> {
-                self.#field.split_last_mut()
-            }
-
-            /// Returns a reference to an element or subslice by index.
-            /// See [`Vec::get`].
-            #visibility fn get<#new_type>(&self, index: #new_type) -> ::core::option::Option<&<#new_type as ::core::slice::SliceIndex<[#enum_ident #enum_generics]>>::Output>
-            where
-                #new_type: ::core::slice::SliceIndex<[#enum_ident #enum_generics]> {
-                self.#field.get(index)
-            }
-
-            /// Returns a mutable reference to an element or subslice by index.
-            /// See [`Vec::get_mut`].
-            #visibility fn get_mut<#new_type>(&mut self, index: #new_type) -> ::core::option::Option<&mut <#new_type as ::core::slice::SliceIndex<[#enum_ident #enum_generics]>>::Output>
-            where
-                #new_type: ::core::slice::SliceIndex<[#enum_ident #enum_generics]> {
-                self.#field.get_mut(index)
-            }
-
-            /// Swaps two elements in the vector.
-            /// See [`Vec::swap`].
-            #visibility fn swap(&mut self, a: usize, b: usize) {
-                self.#field.swap(a, b);
-            }
-
-            /// Reverses the order of elements in the vector.
-            /// See [`Vec::reverse`].
-            #visibility fn reverse(&mut self) {
-                self.#field.reverse();
-            }
-
-            /// Returns an iterator over the vector's elements.
-            /// See [`Vec::iter`].
-            #visibility fn iter(&self) -> ::core::slice::Iter<'_, #enum_ident #enum_generics> {
-                self.#field.iter()
-            }
-
-            /// Returns a mutable iterator over the vector's elements.
-            /// See [`Vec::iter_mut`].
-            #visibility fn iter_mut(&mut self) -> ::core::slice::IterMut<'_, #enum_ident #enum_generics> {
-                self.#field.iter_mut()
-            }
-
             // #visibility fn drain<#new_type>(&mut self, range: #new_type) -> ::std::vec::Drain<'_, <#enum_ident #enum_generics>>
             // where #new_type: ::core::ops::RangeBounds<usize>,
             // {
@@ -528,35 +417,166 @@ impl VecWrapper {
             #visibility const fn is_empty(&self) -> bool {
                 self.#field.is_empty()
             }
+        }
+    }
+
+    /// Generates standard slice methods that directly delegate to the underlying `Vec`.
+    ///
+    /// These methods match their slice counterparts exactly:
+    ///
+    /// - [`first`][slice::first]
+    /// - [`first_mut`][slice::first_mut]
+    /// - [`last`][slice::last]
+    /// - [`last_mut`][slice::last_mut]
+    /// - [`split_first`][slice::split_first]
+    /// - [`split_first_mut`][slice::split_first_mut]
+    /// - [`split_last`][slice::split_last]
+    /// - [`split_last_mut`][slice::split_last_mut]
+    /// - [`get`][slice::get]
+    /// - [`get_mut`][slice::get_mut]
+    /// - [`swap`][slice::swap]
+    /// - [`reverse`][slice::reverse]
+    /// - [`iter`][slice::iter]
+    /// - [`iter_mut`][slice::iter_mut]
+    /// - [`fill_with`][slice::fill_with]
+    /// - [`rotate_left`][slice::rotate_left]
+    /// - [`rotate_right`][slice::rotate_right]
+    /// - [`is_sorted_by`][slice::is_sorted_by]
+    /// - [`is_sorted_by_key`][slice::is_sorted_by_key]
+    /// - [`sort_by`][slice::sort_by]
+    /// - [`sort_by_key`][slice::sort_by_key]
+    /// - [`sort_unstable_by`][slice::sort_unstable_by]
+    /// - [`sort_unstable_by_key`][slice::sort_unstable_by_key]
+    /// - [`binary_search_by`][slice::binary_search_by]
+    /// - [`binary_search_by_key`][slice::binary_search_by_key]
+    #[allow(clippy::too_many_lines)]
+    fn slice_methods_tokens(&self, nodyn: &NodynEnum) -> TokenStream {
+        let field = &self.vec_field;
+        let visibility = &self.definition.vis;
+        let enum_ident = &nodyn.ident;
+        let enum_generics = nodyn.generics_tokens();
+        let nt = &nodyn.generics.new_types(2);
+        let new_type = &nt[0];
+        let new_type2 = &nt[1];
+        let lt = &nodyn.generics.new_lifetime();
+
+        quote! {
+            /// Returns the first element, if any.
+            /// See [`slice`::first`].
+            #visibility fn first(&self) -> ::core::option::Option<&#enum_ident #enum_generics> {
+                self.#field.first()
+            }
+
+            /// Returns a mutable reference to the first element, if any.
+            /// See [`slice::first_mut`].
+            #visibility fn first_mut(&mut self) -> ::core::option::Option<&mut #enum_ident #enum_generics> {
+                self.#field.first_mut()
+            }
+
+            /// Returns the last element, if any.
+            /// See [`slice::last`].
+            #visibility fn last(&self) -> ::core::option::Option<&#enum_ident #enum_generics> {
+                self.#field.last()
+            }
+
+            /// Returns a mutable reference to the last element, if any.
+            /// See [`slice::last_mut`].
+            #visibility fn last_mut(&mut self) -> ::core::option::Option<&mut #enum_ident #enum_generics> {
+                self.#field.last_mut()
+            }
+
+            /// Returns the first element and the rest of the slice, if any.
+            /// See [`slice::split_first`].
+            #visibility fn split_first(&self) -> ::core::option::Option<(&#enum_ident #enum_generics, &[#enum_ident #enum_generics])> {
+                self.#field.split_first()
+            }
+
+            /// Returns a mutable first element and the rest of the slice, if any.
+            /// See [`slice::split_first_mut`].
+            #visibility fn split_first_mut(&mut self) -> ::core::option::Option<(&mut #enum_ident #enum_generics, &mut [#enum_ident #enum_generics])> {
+                self.#field.split_first_mut()
+            }
+
+            /// Returns the last element and the rest of the slice, if any.
+            /// See [`slice::split_last`].
+            #visibility fn split_last(&self) -> ::core::option::Option<(&#enum_ident #enum_generics, &[#enum_ident #enum_generics])> {
+                self.#field.split_last()
+            }
+
+            /// Returns a mutable last element and the rest of the slice, if any.
+            /// See [`slice::split_last_mut`].
+            #visibility fn split_last_mut(&mut self) -> ::core::option::Option<(&mut #enum_ident #enum_generics, &mut [#enum_ident #enum_generics])> {
+                self.#field.split_last_mut()
+            }
+
+            /// Returns a reference to an element or subslice by index.
+            /// See [`slice::get`].
+            #visibility fn get<#new_type>(&self, index: #new_type) -> ::core::option::Option<&<#new_type as ::core::slice::SliceIndex<[#enum_ident #enum_generics]>>::Output>
+            where
+                #new_type: ::core::slice::SliceIndex<[#enum_ident #enum_generics]> {
+                self.#field.get(index)
+            }
+
+            /// Returns a mutable reference to an element or subslice by index.
+            /// See [`slice::get_mut`].
+            #visibility fn get_mut<#new_type>(&mut self, index: #new_type) -> ::core::option::Option<&mut <#new_type as ::core::slice::SliceIndex<[#enum_ident #enum_generics]>>::Output>
+            where
+                #new_type: ::core::slice::SliceIndex<[#enum_ident #enum_generics]> {
+                self.#field.get_mut(index)
+            }
+
+            /// Swaps two elements in the vector.
+            /// See [`slice::swap`].
+            #visibility fn swap(&mut self, a: usize, b: usize) {
+                self.#field.swap(a, b);
+            }
+
+            /// Reverses the order of elements in the vector.
+            /// See [`slice::reverse`].
+            #visibility fn reverse(&mut self) {
+                self.#field.reverse();
+            }
+
+            /// Returns an iterator over the vector's elements.
+            /// See [`slice::iter`].
+            #visibility fn iter(&self) -> ::core::slice::Iter<'_, #enum_ident #enum_generics> {
+                self.#field.iter()
+            }
+
+            /// Returns a mutable iterator over the vector's elements.
+            /// See [`slice::iter_mut`].
+            #visibility fn iter_mut(&mut self) -> ::core::slice::IterMut<'_, #enum_ident #enum_generics> {
+                self.#field.iter_mut()
+            }
 
             /// Fills `self` with elements returned by calling a closure repeatedly.
-            /// See [`Vec::fill_with`].
+            /// See [`slice::fill_with`].
             #visibility fn fill_with<#new_type>(&mut self, f: #new_type)
             where #new_type: ::core::ops::FnMut() -> #enum_ident #enum_generics {
                 self.#field.fill_with(f);
             }
 
             /// Rotates the slice in-place such that the first mid elements of the slice move to the end while the last self.len() - mid elements move to the front.
-            /// See [`Vec::rotate_left`].
+            /// See [`slice::rotate_left`].
             #visibility fn rotate_left(&mut self, mid: usize) {
                 self.#field.rotate_left(mid)
             }
 
             /// Rotates the slice in-place such that the first self.len() - k elements of the slice move to the end while the last k elements move to the front.
-            /// See [`Vec::rotate_right`].
+            /// See [`slice::rotate_right`].
             #visibility fn rotate_right(&mut self, k: usize) {
                 self.#field.rotate_right(k)
             }
 
             /// Checks if the elements are sorted using the given comparator function.
-            /// See [`Vec::is_sorted_by`].
+            /// See [`slice::is_sorted_by`].
             #visibility fn is_sorted_by<#lt, #new_type>(&#lt self, f: #new_type) -> bool
             where #new_type: ::core::ops::FnMut(&#lt #enum_ident #enum_generics, &#lt #enum_ident #enum_generics) -> bool, {
                 self.#field.is_sorted_by(f)
             }
 
             /// Checks if the elements are sorted using the given key extraction function.
-            /// See [`Vec::is_sorted_by_key`].
+            /// See [`slice::is_sorted_by_key`].
             #visibility fn is_sorted_by_key<#lt, #new_type, #new_type2>(&#lt self, f: #new_type) -> bool
             where #new_type: ::core::ops::FnMut(&#lt #enum_ident #enum_generics) -> #new_type2,
                   #new_type2: ::core::cmp::PartialOrd {
@@ -564,14 +584,14 @@ impl VecWrapper {
             }
 
             /// Sorts the slice with a comparison function, preserving initial order of equal elements.
-            /// See [`Vec::sort_by`].
+            /// See [`slice::sort_by`].
             #visibility fn sort_by<#new_type>(&mut self, f: #new_type)
             where #new_type: ::core::ops::FnMut(&#enum_ident #enum_generics, &#enum_ident #enum_generics) -> ::core::cmp::Ordering, {
                 self.#field.sort_by(f);
             }
 
             /// Sorts the slice with a key extraction function, preserving initial order of equal elements.
-            /// See [`Vec::sort_by_key`].
+            /// See [`slice::sort_by_key`].
             #visibility fn sort_by_key<#new_type, #new_type2>(&mut self, f: #new_type)
             where #new_type: ::core::ops::FnMut(&#enum_ident #enum_generics) -> #new_type2,
                   #new_type2: ::core::cmp::Ord {
@@ -579,14 +599,14 @@ impl VecWrapper {
             }
 
             /// Sorts the slice with a comparison function, without preserving the initial order of equal elements.
-            /// See [`Vec::sort_unstable_by`].
+            /// See [`slice::sort_unstable_by`].
             #visibility fn sort_unstable_by<#new_type>(&mut self, f: #new_type)
             where #new_type: ::core::ops::FnMut(&#enum_ident #enum_generics, &#enum_ident #enum_generics) -> ::core::cmp::Ordering, {
                 self.#field.sort_unstable_by(f);
             }
 
             /// Sorts the slice with a key extraction function, without preserving the initial order of equal elements.
-            /// See [`Vec::sort_unstable_by_key`].
+            /// See [`slice::sort_unstable_by_key`].
             #visibility fn sort_unstable_by_key<#new_type, #new_type2>(&mut self, f: #new_type)
             where #new_type: ::core::ops::FnMut(&#enum_ident #enum_generics) -> #new_type2,
                   #new_type2: ::core::cmp::Ord {
@@ -594,20 +614,19 @@ impl VecWrapper {
             }
 
             /// Binary searches this slice with a comparator function.
-            /// See [`Vec::binary_search_by`].
+            /// See [`slice::binary_search_by`].
             #visibility fn binary_search_by<#lt, #new_type>(&#lt self, f: #new_type) -> ::core::result::Result<usize, usize>
             where #new_type: ::core::ops::FnMut(&#lt #enum_ident #enum_generics) -> ::core::cmp::Ordering, {
                 self.#field.binary_search_by(f)
             }
 
             /// Binary searches this slice with a key extraction function.
-            /// See [`Vec::binary_search_by_key`].
+            /// See [`slice::binary_search_by_key`].
             #visibility fn binary_search_by_key<#lt, #new_type, #new_type2>(&#lt self, b: &#new_type2, f: #new_type) -> ::core::result::Result<usize, usize>
             where #new_type: ::core::ops::FnMut(&#lt #enum_ident #enum_generics) -> #new_type2,
                   #new_type2: ::core::cmp::Ord {
                 self.#field.binary_search_by_key(b, f)
             }
-
         }
     }
 
